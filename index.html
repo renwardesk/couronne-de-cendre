@@ -273,7 +273,10 @@ let S=load();
 const RW=480,RH=270;
 let VW=480,VH=270,SC=2;
 const cv=$('#game'),cx=cv.getContext('2d');
-function resize(){const r=$('#app').getBoundingClientRect(),dpr=Math.min(3,window.devicePixelRatio||1);
+function iosFix(){/* iPhone installé : la vue est raccourcie de la hauteur de la barre d'état -> forcer la hauteur réelle de l'écran */
+  if(navigator.standalone!==true)return;const land=Math.abs(window.orientation||0)===90||innerWidth>innerHeight,h=land?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height);
+  for(const el of [document.documentElement,document.body,$('#app')])el.style.height=h+'px'}
+function resize(){iosFix();const r=$('#app').getBoundingClientRect(),dpr=Math.min(3,window.devicePixelRatio||1);
   const short=Math.min(r.width,r.height),s=Math.max(1,short/270);VW=Math.round(r.width/s);VH=Math.round(r.height/s);
   cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);SC=cv.width/VW;
   const cs=getComputedStyle($('#safe'));SAFE={t:parseFloat(cs.paddingTop)/s||0,r:parseFloat(cs.paddingRight)/s||0,b:parseFloat(cs.paddingBottom)/s||0,l:parseFloat(cs.paddingLeft)/s||0};
