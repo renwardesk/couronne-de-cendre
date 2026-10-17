@@ -251,6 +251,7 @@ const DUNGEONS={
   liche:{n:'Crypte des esprits',boss:'liche',floor:['snow9',16,16],shade:'rgba(25,30,60,.55)',cliff:'cliff_g',need:2,mobs:['archer','spirit','eye','bat'],x:800,y:210},
   wyrm:{n:'Sanctuaire du Tengu',boss:'wyrm',floor:['f_dgreen',8,8],shade:'rgba(10,20,10,.25)',cliff:'cliff_g',need:3,mobs:['spider','spirit','brute','eye'],x:770,y:540}
 };
+const MOBHP=1.9,BOSSHP=1.5;
 const MOBS={spider:{n:'Araignée',spr:'mo_SpiderRed',sc:1,hp:55,r:7,spd:40,drop:'bois',xp:1.2},bat:{n:'Chauve-souris',spr:'mo_BlueBat',sc:1,hp:32,r:6,spd:58,drop:'pierre',fly:true},spirit:{n:'Feu follet',spr:'mo_Spirit',sc:1,hp:70,r:7,spd:30,drop:'or',xp:1.4},eye:{n:'Œil gardien',spr:'mo_Eye',sc:1.1,hp:95,r:8,spd:16,drop:'or',xp:1.6},slime:{n:'Gelée',spr:'mo_Slime',sc:1,hp:60,r:7,spd:34,drop:'bois'},archer:{n:'Crâne de feu',spr:'mo_Skull',sc:1,hp:45,r:6,spd:42,drop:'pierre'},brute:{n:'Cyclope',spr:'mo_Cyclope',sc:1.4,hp:150,r:10,spd:26,drop:'or',xp:1.8}};
 const FOLK=['OldMan','OldWoman','Boy','Child','ManGreen','Monk2','Inspector','Eskimo'].filter(n=>AT['ch_'+n]&&AT['ch_'+n][3]>=64);
 const DEF={res:{or:80,bois:60,pierre:40,cristal:0},bld:{hall:1,forge:0,sanct:0,caserne:0,marche:0},
@@ -457,11 +458,11 @@ function buildRoom(id,idx){
     trig:[],enemies:[],boss:null,props:[]};
   for(const [x,y,n] of [[34,58,'barrels'],[RW-34,58,'rock_grey'],[30,RH-16,'rock_brown'],[RW-36,RH-16,'barrels']]){w.props.push({type:'spr',n,x,y});w.solids.push({x:x-10,y:y-6,w:20,h:6})}
   for(const [x,b] of [[100,1],[160,3],[320,5],[380,2]])w.props.push({type:'wall',n:'banner'+b,x,y:34});
-  if(boss){const B=BOSSES[D.boss],aw=(S.wins[B.id]||0)>=1,bh=Math.round(B.hp*(aw?1.6:1));w.boss={isBoss:true,awake:aw,def:B,x:RW/2,y:110,r:B.r,hp:bh,maxhp:bh,state:'walk',t:1.8,phase:1,dash:null,flash:0,contact:0,stunT:0,fx:1}}
+  if(boss){const B=BOSSES[D.boss],aw=(S.wins[B.id]||0)>=1,bh=Math.round(B.hp*BOSSHP*(aw?1.6:1));w.boss={isBoss:true,awake:aw,def:B,x:RW/2,y:110,r:B.r,hp:bh,maxhp:bh,state:'walk',t:1.8,phase:1,dash:null,flash:0,contact:0,stunT:0,fx:1}}
   else{const n=idx?6:4;for(let i=0;i<n;i++)w.enemies.push(mob(D.mobs[i%D.mobs.length],rnd(60,RW-60),rnd(70,150),lv,i<(idx?2:1)))}
   return w;
 }
-function mob(type,x,y,lv,elite){const T=MOBS[type],k=elite?2.2:1;return{elite:!!elite,type,x,y,hp:Math.round(T.hp*lv*k),maxhp:Math.round(T.hp*lv*k),r:T.r+(elite?1:0),spd:T.spd*(elite?1.15:1),cd:rnd(1,2.5),busy:0,stunT:0,flash:0,aggro:false,leap:null,hx:x,hy:y,t:rnd(0,9),fx:0,fy:1,lv}}
+function mob(type,x,y,lv,elite){const T=MOBS[type],k=(elite?2.2:1)*MOBHP;return{elite:!!elite,type,x,y,hp:Math.round(T.hp*lv*k),maxhp:Math.round(T.hp*lv*k),r:T.r+(elite?1:0),spd:T.spd*(elite?1.15:1),cd:rnd(1,2.5),busy:0,stunT:0,flash:0,aggro:false,leap:null,hx:x,hy:y,t:rnd(0,9),fx:0,fy:1,lv}}
 function blockedAt(w,x,y,r){if(x<r||y<r+4||x>w.w-r||y>w.h-r)return true;for(const s of w.solids)if(x>s.x-r&&x<s.x+s.w+r&&y>s.y-r&&y<s.y+s.h+r)return true;return false}
 function move(e,dx,dy,r=5){let ok=true;if(!blockedAt(world,e.x+dx,e.y,r))e.x+=dx;else ok=false;if(!blockedAt(world,e.x,e.y+dy,r))e.y+=dy;else ok=false;return ok}
 
@@ -870,22 +871,22 @@ function render(t){
   c.restore();
   // HUD
   const portrait=VW<VH;
-  G.players.forEach((p,i)=>{const x=12,y=20+i*44;
+  const coarse=matchMedia('(pointer:coarse)').matches;
+  G.players.forEach((p,i)=>{const x=portrait?12:Math.round(VW/2-65),y=(portrait?VH-(coarse?100:40):VH-42)-i*44;
     px(c,'#241c16',x-3,y-9,132,33);nine(c,IMG.frame,x-8,y-14,142,43,8);
     if(AT['fc_'+p.h.look])frame(c,'fc_'+p.h.look,0,0,38,38,x+11,y+22,{sc:.6,tint:p.down?'rgba(0,0,0,.5)':null});
     txt(c,p.h.name+' · niv. '+p.h.lv,x+26,y,'#f2e2b8','9px "Alegreya Sans", sans-serif');
     hearts(c,x+25,y+2,p.hp,p.maxhp);bar(c,x+26,y+17,64,3,p.st/p.maxst,'#b9c35a');bar(c,x+26,y+21,64,1,p.h.xp/XPN(p.h.lv),'#6fb6e0');
     for(let k=0;k<3;k++){const id=p.h.eq[k],sx=x+92+k*11,cdv=id?SKL(id).cd*(1-.06*S.bld.caserne):1,f=id?clamp(p.sk[k]/cdv,0,1):1;px(c,id?'#2a3a48':'#1a1612',sx,y-4,10,10);px(c,'#6fb6e0',sx,y-4+Math.round(10*f),10,10-Math.round(10*f));txt(c,String(k+1),sx+5,y+4,'#10202a','7px sans-serif','center')}});
-  const coarse=matchMedia('(pointer:coarse)').matches;
   const nm=world.id==='capital'?TIERS[S.bld.hall]+' de Cendre':world.name;
-  txt(c,nm,VW/2,portrait?VH-(coarse?170:14):VH-8,'#f2e2b8','10px "Pirata One", Georgia, serif','center');
-  if(NET.online)txt(c,'En ligne · '+NET.count+(NET.count>1?' joueurs ici':' joueur ici'),12,20+G.players.length*44,'#9fd4f0','8px "Alegreya Sans", sans-serif');
-  if(world.boss){const b=world.boss,by=portrait?(G.players.length>1?116:70):46,bw=Math.min(200,VW-70);
-    const bx=portrait?VW/2:Math.max(VW/2,170+bw/2);
+  txt(c,nm,10,18,'#f2e2b8','11px "Pirata One", Georgia, serif');
+  if(NET.online)txt(c,'En ligne · '+NET.count+(NET.count>1?' joueurs ici':' joueur ici'),10,30,'#9fd4f0','8px "Alegreya Sans", sans-serif');
+  if(world.boss){const b=world.boss,by=portrait?110:74,bw=Math.min(200,VW-70);
+    const bx=VW/2;
     txt(c,b.def.n+(b.awake?' éveillé':'')+(b.phase>1?' — enragé':''),bx+12,by-6,'#efe6cf','11px "Pirata One", Georgia, serif','center');
     px(c,'#241c16',bx-bw/2-2,by-2,bw+4,8);nine(c,IMG.frame,bx-bw/2-7,by-7,bw+14,18,8);bar(c,bx-bw/2,by+1,bw,4,b.hp/b.maxhp,b.phase>1?'#e0603c':'#b8402e');
     frame(c,b.def.face,0,0,38,38,bx-bw/2-18,by+12,{sc:.6})}
-  if(G.run&&world.kind==='dungeon')txt(c,'Butin : '+(Object.entries(G.run.loot).map(([k,v])=>v+' '+RES[k].n.toLowerCase()).join(', ')||'—'),VW/2,portrait?VH-(coarse?160:24):VH-20,'#d8cfb4','8px "Alegreya Sans", sans-serif','center');
+  if(G.run&&world.kind==='dungeon')txt(c,'Butin : '+(Object.entries(G.run.loot).map(([k,v])=>v+' '+RES[k].n.toLowerCase()).join(', ')||'—'),10,NET.online?42:30,'#d8cfb4','8px "Alegreya Sans", sans-serif');
   if(G.banner&&G.banner.t>0){c.globalAlpha=Math.min(1,G.banner.t);txt(c,G.banner.txt,VW/2,VH/2-40,'#f2d38a','18px "Pirata One", Georgia, serif','center');c.globalAlpha=1}
   if(!ready(IMG.atlas)){txt(c,'Chargement des graphismes…',VW/2,VH/2,'#f2e2b8','11px "Alegreya Sans", sans-serif','center')}
   const low=G.players.some(p=>!p.down&&p.hp<p.maxhp*.3);if(low||G.flashR>0){const a=(G.flashR>0?.35:0)+(low?.18+.1*Math.sin(t*6):0),g=c.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.35,VW/2,VH/2,Math.max(VW,VH)*.7);g.addColorStop(0,'rgba(180,20,20,0)');g.addColorStop(1,'rgba(180,20,20,'+a+')');c.fillStyle=g;c.fillRect(0,0,VW,VH)}
