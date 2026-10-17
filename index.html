@@ -38,7 +38,7 @@
 .detail .btn small{font-family:var(--body);font-size:11px}
 html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--fg)}
 body{font-family:var(--body);font-size:16px;line-height:1.4;overscroll-behavior:none}
-.app{position:fixed;inset:0;background:var(--bg);touch-action:none;user-select:none;-webkit-user-select:none}
+.app{position:fixed;top:0;left:0;right:0;height:100vh;height:100lvh;background:var(--bg);touch-action:none;user-select:none;-webkit-user-select:none}
 #game{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
 .top{position:absolute;top:0;right:0;padding:calc(6px + env(safe-area-inset-top,0px)) calc(8px + env(safe-area-inset-right,0px)) 0 8px;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;max-width:70%;pointer-events:none}
 .top>*{pointer-events:auto}
@@ -78,8 +78,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 .slot{font:inherit;font-size:12px;width:24px;height:24px;padding:0;background:var(--bg);color:var(--muted);border:1px solid var(--line);border-radius:3px;cursor:pointer}
 .slot[aria-pressed="true"]{background:var(--sky);color:#0b1a24;border-color:var(--sky);font-weight:700}
 .xp{height:4px;background:#1a140f;width:100%}.xp i{display:block;height:100%;background:var(--sky)}
-.turn{display:none;position:absolute;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font-size:13px;color:var(--muted);background:rgba(16,14,10,.7);padding:4px 10px;border-radius:3px;white-space:nowrap}
-@media (pointer:coarse) and (orientation:portrait){.turn{display:block}}
+.turn{display:none;position:absolute;left:50%;top:42%;pointer-events:none;transform:translateX(-50%);font-size:13px;color:var(--muted);background:rgba(16,14,10,.7);padding:4px 10px;border-radius:3px;white-space:nowrap}
+@media (pointer:coarse) and (orientation:portrait){.turn{display:block;animation:turnOff .4s 5s forwards}
+  .stick{width:100px;height:100px}.knob{width:40px;height:40px;margin:-20px 0 0 -20px}
+  .btns{gap:6px}.btns button{width:46px;height:46px;font-size:10px}#bAtk{width:60px;height:60px;font-size:12px}
+  .pad{padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}}
+@keyframes turnOff{to{opacity:0;visibility:hidden}}
+#safe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 .sheet{position:absolute;inset:0;background:rgba(10,9,7,.8);overflow:auto;padding:calc(12px + env(safe-area-inset-top,0px)) max(12px, env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(12px, env(safe-area-inset-left,0px));touch-action:pan-y;user-select:text;-webkit-user-select:text}
 .sheet .in{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 .sheet h2{font-family:var(--display);font-weight:400;font-size:34px;color:var(--gold);margin:0;line-height:1}
@@ -111,7 +116,7 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
 
 
 <div class="app" id="app">
-  <canvas id="game" aria-label="Jeu Couronne de Cendre"></canvas>
+  <canvas id="game" aria-label="Jeu Couronne de Cendre"></canvas><div id="safe"></div>
   <div class="top">
     <div class="res" id="res"></div>
     <button class="btn ghost sm" id="bMute">Son</button>
@@ -270,8 +275,12 @@ let VW=480,VH=270,SC=2;
 const cv=$('#game'),cx=cv.getContext('2d');
 function resize(){const r=$('#app').getBoundingClientRect(),dpr=Math.min(3,window.devicePixelRatio||1);
   const short=Math.min(r.width,r.height),s=Math.max(1,short/270);VW=Math.round(r.width/s);VH=Math.round(r.height/s);
-  cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);SC=cv.width/VW;}
-addEventListener('resize',resize);resize();
+  cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);SC=cv.width/VW;
+  const cs=getComputedStyle($('#safe'));SAFE={t:parseFloat(cs.paddingTop)/s||0,r:parseFloat(cs.paddingRight)/s||0,b:parseFloat(cs.paddingBottom)/s||0,l:parseFloat(cs.paddingLeft)/s||0};
+  const pd=$('.pad'),pr=pd&&getComputedStyle(pd).display!=='none'?pd.getBoundingClientRect():null;
+  if(pr){let top=r.height;for(const el of pd.querySelectorAll('.stick,.btns')){const q=el.getBoundingClientRect();top=Math.min(top,q.top)}PADTOP=(top-r.top)/s}else PADTOP=VH-SAFE.b;}
+let SAFE={t:0,r:0,b:0,l:0},PADTOP=270;
+addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,250));if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();addEventListener('load',resize);
 
 /* ===== Dessin des personnages ===== */
 function shadow(c,x,y,rx,ry=2.5){c.fillStyle='rgba(0,0,0,.3)';c.beginPath();c.ellipse(x,y,rx,ry,0,0,7);c.fill()}
@@ -872,21 +881,21 @@ function render(t){
   // HUD
   const portrait=VW<VH;
   const coarse=matchMedia('(pointer:coarse)').matches;
-  G.players.forEach((p,i)=>{const x=portrait?12:Math.round(VW/2-65),y=(portrait?VH-(coarse?100:40):VH-42)-i*44;
+  G.players.forEach((p,i)=>{const x=portrait?Math.round(10+SAFE.l):Math.round(VW/2-65),y=(portrait?(coarse?PADTOP-36:VH-40-SAFE.b):VH-42-SAFE.b)-i*44;
     px(c,'#241c16',x-3,y-9,132,33);nine(c,IMG.frame,x-8,y-14,142,43,8);
     if(AT['fc_'+p.h.look])frame(c,'fc_'+p.h.look,0,0,38,38,x+11,y+22,{sc:.6,tint:p.down?'rgba(0,0,0,.5)':null});
     txt(c,p.h.name+' · niv. '+p.h.lv,x+26,y,'#f2e2b8','9px "Alegreya Sans", sans-serif');
     hearts(c,x+25,y+2,p.hp,p.maxhp);bar(c,x+26,y+17,64,3,p.st/p.maxst,'#b9c35a');bar(c,x+26,y+21,64,1,p.h.xp/XPN(p.h.lv),'#6fb6e0');
     for(let k=0;k<3;k++){const id=p.h.eq[k],sx=x+92+k*11,cdv=id?SKL(id).cd*(1-.06*S.bld.caserne):1,f=id?clamp(p.sk[k]/cdv,0,1):1;px(c,id?'#2a3a48':'#1a1612',sx,y-4,10,10);px(c,'#6fb6e0',sx,y-4+Math.round(10*f),10,10-Math.round(10*f));txt(c,String(k+1),sx+5,y+4,'#10202a','7px sans-serif','center')}});
   const nm=world.id==='capital'?TIERS[S.bld.hall]+' de Cendre':world.name;
-  txt(c,nm,10,18,'#f2e2b8','11px "Pirata One", Georgia, serif');
-  if(NET.online)txt(c,'En ligne · '+NET.count+(NET.count>1?' joueurs ici':' joueur ici'),10,30,'#9fd4f0','8px "Alegreya Sans", sans-serif');
-  if(world.boss){const b=world.boss,by=portrait?110:74,bw=Math.min(200,VW-70);
+  txt(c,nm,10+SAFE.l,18+SAFE.t,'#f2e2b8','11px "Pirata One", Georgia, serif');
+  if(NET.online)txt(c,'En ligne · '+NET.count+(NET.count>1?' joueurs ici':' joueur ici'),10+SAFE.l,30+SAFE.t,'#9fd4f0','8px "Alegreya Sans", sans-serif');
+  if(world.boss){const b=world.boss,by=(portrait?110:74)+SAFE.t*.5,bw=Math.min(200,VW-70);
     const bx=VW/2;
     txt(c,b.def.n+(b.awake?' éveillé':'')+(b.phase>1?' — enragé':''),bx+12,by-6,'#efe6cf','11px "Pirata One", Georgia, serif','center');
     px(c,'#241c16',bx-bw/2-2,by-2,bw+4,8);nine(c,IMG.frame,bx-bw/2-7,by-7,bw+14,18,8);bar(c,bx-bw/2,by+1,bw,4,b.hp/b.maxhp,b.phase>1?'#e0603c':'#b8402e');
     frame(c,b.def.face,0,0,38,38,bx-bw/2-18,by+12,{sc:.6})}
-  if(G.run&&world.kind==='dungeon')txt(c,'Butin : '+(Object.entries(G.run.loot).map(([k,v])=>v+' '+RES[k].n.toLowerCase()).join(', ')||'—'),10,NET.online?42:30,'#d8cfb4','8px "Alegreya Sans", sans-serif');
+  if(G.run&&world.kind==='dungeon')txt(c,'Butin : '+(Object.entries(G.run.loot).map(([k,v])=>v+' '+RES[k].n.toLowerCase()).join(', ')||'—'),10+SAFE.l,(NET.online?42:30)+SAFE.t,'#d8cfb4','8px "Alegreya Sans", sans-serif');
   if(G.banner&&G.banner.t>0){c.globalAlpha=Math.min(1,G.banner.t);txt(c,G.banner.txt,VW/2,VH/2-40,'#f2d38a','18px "Pirata One", Georgia, serif','center');c.globalAlpha=1}
   if(!ready(IMG.atlas)){txt(c,'Chargement des graphismes…',VW/2,VH/2,'#f2e2b8','11px "Alegreya Sans", sans-serif','center')}
   const low=G.players.some(p=>!p.down&&p.hp<p.maxhp*.3);if(low||G.flashR>0){const a=(G.flashR>0?.35:0)+(low?.18+.1*Math.sin(t*6):0),g=c.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.35,VW/2,VH/2,Math.max(VW,VH)*.7);g.addColorStop(0,'rgba(180,20,20,0)');g.addColorStop(1,'rgba(180,20,20,'+a+')');c.fillStyle=g;c.fillRect(0,0,VW,VH)}
