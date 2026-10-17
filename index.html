@@ -855,7 +855,7 @@ function render(t){
     if(p.type==='spr')L.push({y:p.y,f:()=>spr(c,p.n,p.x,p.y+2)});
     if(p.type==='post')L.push({y:p.y,f:()=>{px(c,'#5a4030',p.x-1,p.y-10,3,11);px(c,'#7a5838',p.x-1,p.y-10,3,2)}});
     if(p.type==='chest')L.push({y:p.y,f:()=>frame(c,'i_chest',p.open?1:0,0,16,16,p.x,p.y+2,{sc:p.big?2:1.2,tint:p.big&&!p.open?'rgba(255,210,90,.18)':null})});
-    if(p.type==='portal')L.push({y:p.y,f:()=>{const D=DUNGEONS[p.id],B=BOSSES[D.boss],open=S.bld.hall>=D.need;
+    if(p.type==='portal')L.push({y:p.y,f:()=>{const D=DUNGEONS[p.id],B=BOSSES[D.boss],open=!dunLocked(D);
       c.globalAlpha=open?.45+.25*Math.sin(t*3):.6;c.fillStyle=open?B.eye:'#111';c.beginPath();c.ellipse(p.x,p.y-16,14,18,0,0,7);c.fill();c.globalAlpha=1;
       spr(c,'arch',p.x,p.y+2);if(!open)spr(c,'lockdoor',p.x,p.y-6);
       txt(c,D.n+((S.wins[D.boss]||0)>=1?' · boss éveillé':''),p.x,p.y-50,open?'#f2e2b8':'#a99f86','8px "Alegreya Sans", sans-serif','center')}})}
@@ -967,7 +967,8 @@ function drawMounted(c,h,s,t){
   if(side||d===0)frame(c,'ch_'+h.look,d,0,16,16,x+(side?(d===2?2:-2):0),y-7-(s.moving?f:0));
 }
 /* ---------- régions ---------- */
-function regionLocked(id){return !!REG[id]&&S.bld.hall<REG[id].need}
+function regionLocked(id){return !!REG[id]&&!isAdmin()&&S.bld.hall<REG[id].need}
+function dunLocked(D){return !isAdmin()&&S.bld.hall<D.need}
 /* ---------- domaine des aventuriers ---------- */
 const PLOTS=[[120,170],[320,170],[520,170],[120,380],[320,380],[520,380]];
 const HOUSE=[null,{n:'Cabane',spr:'hut',w:208,h:144,cost:{bois:60,pierre:30}},{n:'Maison',spr:'h_orange',w:272,h:176,cost:{or:120,bois:120,pierre:80}},{n:'Manoir',spr:'h_big',w:352,h:208,cost:{or:300,bois:200,pierre:200,cristal:40}}];
@@ -1019,7 +1020,7 @@ function triggers(){
   for(const t of world.trig){if(!t.auto||dist(p.x,p.y,t.x,t.y)>t.r)continue;
     if(t.kind==='exit'){if(t.to==='estates'&&t.plot!=null){go('estates',{plot:t.plot});return}travel(t.to,world.id);return}
     if(t.kind==='house'){go('house',{plot:t.i});return}
-    if(t.kind==='dungeon'){const D=DUNGEONS[t.id];if(S.bld.hall<D.need){if(G.msgT<=0){float(p.x,p.y-28,'Hôtel de ville niv. '+D.need+' requis','#ff9a70');G.msgT=1.2}}else{go('dungeon',{id:t.id,idx:0});return}}
+    if(t.kind==='dungeon'){const D=DUNGEONS[t.id];if(dunLocked(D)){if(G.msgT<=0){float(p.x,p.y-28,'Hôtel de ville niv. '+D.need+' requis','#ff9a70');G.msgT=1.2}}else{go('dungeon',{id:t.id,idx:0});return}}
     if(t.kind==='door'){go('dungeon',{id:world.id,idx:world.room+1});return}}
 }
 function finish(){
@@ -1110,7 +1111,7 @@ function drawWorldMap(){
   c.font='10px "Alegreya Sans", sans-serif';c.fillText('Touchez une région découverte pour vous y rendre. ★ boss vaincu.',14,38);
   cv.onclick=e=>{const r=cv.getBoundingClientRect(),mx=(e.clientX-r.left)/r.width*W,my=(e.clientY-r.top)/r.height*H;
     for(const k of Object.keys(P)){if(dist(mx,my,...P[k])<28){if(world.kind==='dungeon'){$('#mapMsg').textContent='Impossible de quitter un donjon par la carte.';return}
-      if(k!=='capitale'&&k!=='estates'&&(regionLocked(k)||!S.disc.includes(k))){$('#mapMsg').textContent=regionLocked(k)?'Région verrouillée : améliorez l\'hôtel de ville.':'Région pas encore découverte : rejoignez-la à pied.';return}
+      if(k!=='capitale'&&k!=='estates'&&(regionLocked(k)||!S.disc.includes(k)&&!isAdmin())){$('#mapMsg').textContent=regionLocked(k)?'Région verrouillée : améliorez l\'hôtel de ville.':'Région pas encore découverte : rejoignez-la à pied.';return}
       closeMap();if(k==='capitale')go('town');else if(k==='estates')go('estates');else go('region',{id:k});return}}};
 }
 
@@ -1926,7 +1927,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='12.2';
+const VERSION='12.3';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
