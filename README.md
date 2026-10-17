@@ -8,6 +8,14 @@ Action-RPG 2D vu de dessus, **coop en ligne** : une ville-château partagée que
 - **Android (Chrome)** : ouvrir le lien → menu ⋮ → *Installer l'application* / *Ajouter à l'écran d'accueil*.
 - **iPhone (Safari)** : ouvrir le lien → bouton Partager → *Sur l'écran d'accueil*.
 
+## Contenu du jeu
+- **Héros** : à la connexion, on choisit son héros ou on en crée un nouveau (bouton +, 3 au maximum). La classe (Lame, Gardien, Arcaniste) et l'apparence sont définitives.
+- **Progression** : à chaque niveau, 3 points de caractéristique (Force, Dextérité, Mana) et 1 point de talent ; arbre de talents de 3 branches par classe.
+- **Équipement** : 8 emplacements (arme, main gauche, tête, torse, mains, pieds, amulette, anneau), prérequis de caractéristiques, pièces réservées à une classe, 4 panoplies avec bonus à 2 et 4 pièces.
+- **Monde** : 4 grandes régions avec routes, camps, ruines, lacs et forêts ; donjons de 5 salles (combat, pièges, trésor, vagues, boss).
+- **Récolte** : bois, pierre, fer, herbes et cristal à ramasser dans les régions.
+- **Quêtes** : une vingtaine de quêtes données par les personnages de la cité et des camps.
+
 ## Architecture
 - Client : un seul `index.html` (canvas + JS vanilla), `atlas.png`, `snd/`. PWA (manifest + service worker).
 - Serveur : **Supabase** (projet `couronne-de-cendre`).
