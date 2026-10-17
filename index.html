@@ -65,9 +65,14 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 @media (pointer:coarse){.pad{display:flex}}
 .stick{width:120px;height:120px;border-radius:50%;background:rgba(36,28,22,.45);border:2px solid rgba(220,174,76,.35);position:relative;touch-action:none}
 .knob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(42,38,30,.8);border:2px solid var(--gold)}
-.btns{display:grid;grid-template-columns:repeat(4,auto);gap:8px;align-items:end;justify-items:center}
-.btns button{font:inherit;font-weight:700;font-size:12px;touch-action:none;border-radius:50%;border:2px solid rgba(255,255,255,.25);color:var(--fg);background:rgba(36,28,22,.55);width:58px;height:58px;padding:0}
-#bAtk{width:74px;height:74px;border-color:var(--ember);font-size:14px}
+.btns{display:flex;flex-direction:column;align-items:flex-end;gap:10px;--A:84px;--B:50px;--R:110px;--box:182px}
+.arc{position:relative;width:var(--box);height:var(--box)}
+.arc button{position:absolute;width:var(--B)!important;height:var(--B)!important;left:calc(var(--box) - var(--A)/2 + var(--R)*var(--x) - var(--B)/2);top:calc(var(--box) - var(--A)/2 + var(--R)*var(--y) - var(--B)/2)}
+#bRoll{--x:-1;--y:0}#bS1{--x:-.866;--y:-.5}#bS2{--x:-.5;--y:-.866}#bS3{--x:0;--y:-1}
+.arc #bAtk{width:var(--A)!important;height:var(--A)!important;left:calc(var(--box) - var(--A));top:calc(var(--box) - var(--A))}
+.aux{display:flex;gap:8px}.aux button{width:46px!important;height:46px!important;font-size:10px!important;opacity:.85}
+.btns button{font:inherit;font-weight:700;font-size:11px;touch-action:none;border-radius:50%;border:2px solid rgba(255,255,255,.25);color:var(--fg);background:rgba(36,28,22,.5);padding:0;line-height:1.05}
+#bAtk{border-color:var(--ember)!important;font-size:15px!important;background:rgba(90,30,20,.55)!important}
 #bS1,#bS2,#bS3{border-color:var(--sky)}
 .skills{display:flex;flex-direction:column;gap:4px;width:100%}
 .sk{display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;border-top:1px solid var(--line)}
@@ -81,7 +86,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-o
 .turn{display:none;position:absolute;left:50%;top:42%;pointer-events:none;transform:translateX(-50%);font-size:13px;color:var(--muted);background:rgba(16,14,10,.7);padding:4px 10px;border-radius:3px;white-space:nowrap}
 @media (pointer:coarse) and (orientation:portrait){.turn{display:block;animation:turnOff .4s 5s forwards}
   .stick{width:100px;height:100px}.knob{width:40px;height:40px;margin:-20px 0 0 -20px}
-  .btns{gap:6px}.btns button{width:46px;height:46px;font-size:10px}#bAtk{width:60px;height:60px;font-size:12px}
+  .btns{--A:72px;--B:42px;--R:92px;--box:152px;gap:8px}.btns button{font-size:10px}.aux button{width:40px!important;height:40px!important;font-size:9px!important}
   .pad{padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}}
 @keyframes turnOff{to{opacity:0;visibility:hidden}}
 #safe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
@@ -129,8 +134,8 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
   <div class="pad">
     <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
     <div class="btns">
-      <button id="bS1">Tech. 1</button><button id="bS2">Tech. 2</button><button id="bS3">Tech. 3</button><button id="bMt">Monture</button>
-      <button id="bAct">Action</button><button id="bRoll">Roulade</button><button id="bAtk">Frapper</button>
+      <div class="aux"><button id="bAct">Action</button><button id="bMt">Monture</button></div>
+      <div class="arc"><button id="bRoll">Roulade</button><button id="bS1">Tech. 1</button><button id="bS2">Tech. 2</button><button id="bS3">Tech. 3</button><button id="bAtk">Frapper</button></div>
     </div>
   </div>
   <div class="ov" id="ov" hidden><div class="panel" id="ovp"></div></div>
@@ -281,7 +286,7 @@ function resize(){iosFix();const r=$('#app').getBoundingClientRect(),dpr=Math.mi
   cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);SC=cv.width/VW;
   const cs=getComputedStyle($('#safe'));SAFE={t:parseFloat(cs.paddingTop)/s||0,r:parseFloat(cs.paddingRight)/s||0,b:parseFloat(cs.paddingBottom)/s||0,l:parseFloat(cs.paddingLeft)/s||0};
   const pd=$('.pad'),pr=pd&&getComputedStyle(pd).display!=='none'?pd.getBoundingClientRect():null;
-  if(pr){let top=r.height;for(const el of pd.querySelectorAll('.stick,.btns')){const q=el.getBoundingClientRect();top=Math.min(top,q.top)}PADTOP=(top-r.top)/s}else PADTOP=VH-SAFE.b;}
+  if(pr){let top=r.height;for(const el of pd.querySelectorAll('.stick')){const q=el.getBoundingClientRect();top=Math.min(top,q.top)}PADTOP=(top-r.top)/s}else PADTOP=VH-SAFE.b;}
 let SAFE={t:0,r:0,b:0,l:0},PADTOP=270;
 addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,250));if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();addEventListener('load',resize);
 
@@ -884,12 +889,12 @@ function render(t){
   // HUD
   const portrait=VW<VH;
   const coarse=matchMedia('(pointer:coarse)').matches;
-  G.players.forEach((p,i)=>{const x=portrait?Math.round(10+SAFE.l):Math.round(VW/2-65),y=(portrait?(coarse?PADTOP-36:VH-40-SAFE.b):VH-42-SAFE.b)-i*44;
-    px(c,'#241c16',x-3,y-9,132,33);nine(c,IMG.frame,x-8,y-14,142,43,8);
+  G.players.forEach((p,i)=>{c.save();c.globalAlpha=.6;const x=portrait?Math.round(10+SAFE.l):Math.round(VW/2-65),y=(portrait?(coarse?PADTOP-36:VH-40-SAFE.b):VH-42-SAFE.b)-i*44;
+    c.globalAlpha=.3;px(c,'#241c16',x-3,y-9,132,33);c.globalAlpha=.55;nine(c,IMG.frame,x-8,y-14,142,43,8);c.globalAlpha=.85;
     if(AT['fc_'+p.h.look])frame(c,'fc_'+p.h.look,0,0,38,38,x+11,y+22,{sc:.6,tint:p.down?'rgba(0,0,0,.5)':null});
     txt(c,p.h.name+' · niv. '+p.h.lv,x+26,y,'#f2e2b8','9px "Alegreya Sans", sans-serif');
     hearts(c,x+25,y+2,p.hp,p.maxhp);bar(c,x+26,y+17,64,3,p.st/p.maxst,'#b9c35a');bar(c,x+26,y+21,64,1,p.h.xp/XPN(p.h.lv),'#6fb6e0');
-    for(let k=0;k<3;k++){const id=p.h.eq[k],sx=x+92+k*11,cdv=id?SKL(id).cd*(1-.06*S.bld.caserne):1,f=id?clamp(p.sk[k]/cdv,0,1):1;px(c,id?'#2a3a48':'#1a1612',sx,y-4,10,10);px(c,'#6fb6e0',sx,y-4+Math.round(10*f),10,10-Math.round(10*f));txt(c,String(k+1),sx+5,y+4,'#10202a','7px sans-serif','center')}});
+    for(let k=0;k<3;k++){const id=p.h.eq[k],sx=x+92+k*11,cdv=id?SKL(id).cd*(1-.06*S.bld.caserne):1,f=id?clamp(p.sk[k]/cdv,0,1):1;px(c,id?'#2a3a48':'#1a1612',sx,y-4,10,10);px(c,'#6fb6e0',sx,y-4+Math.round(10*f),10,10-Math.round(10*f));txt(c,String(k+1),sx+5,y+4,'#10202a','7px sans-serif','center')}c.restore()});
   const nm=world.id==='capital'?TIERS[S.bld.hall]+' de Cendre':world.name;
   txt(c,nm,10+SAFE.l,18+SAFE.t,'#f2e2b8','11px "Pirata One", Georgia, serif');
   if(NET.online)txt(c,'En ligne · '+NET.count+(NET.count>1?' joueurs ici':' joueur ici'),10+SAFE.l,30+SAFE.t,'#9fd4f0','8px "Alegreya Sans", sans-serif');
