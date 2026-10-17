@@ -967,7 +967,7 @@ function drawMounted(c,h,s,t){
   if(side||d===0)frame(c,'ch_'+h.look,d,0,16,16,x+(side?(d===2?2:-2):0),y-7-(s.moving?f:0));
 }
 /* ---------- régions ---------- */
-function regionLocked(id){return S.bld.hall<REG[id].need}
+function regionLocked(id){return !!REG[id]&&S.bld.hall<REG[id].need}
 /* ---------- domaine des aventuriers ---------- */
 const PLOTS=[[120,170],[320,170],[520,170],[120,380],[320,380],[520,380]];
 const HOUSE=[null,{n:'Cabane',spr:'hut',w:208,h:144,cost:{bois:60,pierre:30}},{n:'Maison',spr:'h_orange',w:272,h:176,cost:{or:120,bois:120,pierre:80}},{n:'Manoir',spr:'h_big',w:352,h:208,cost:{or:300,bois:200,pierre:200,cristal:40}}];
@@ -1007,6 +1007,8 @@ function buildHouse(i){const P=S.plots[i],H=HOUSE[P.lvl];
 
 /* ---------- déplacements entre scènes ---------- */
 function travel(to,from){
+  if(to==='field'){go('region',{id:'plaine',from:'capitale'});return}
+  if(to!=='capitale'&&to!=='estates'&&!REG[to])return;
   if(to==='capitale'){go('town',from==='estates'?'west':'gate');return}
   if(to==='estates'){go('estates');return}
   if(regionLocked(to)){const p=G.players[0];if(G.msgT<=0){float(p.x,p.y-28,REG[to].n+' : hôtel de ville niv. '+REG[to].need+' requis','#ff9a70');G.msgT=1.5}return}
@@ -1927,7 +1929,7 @@ $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSO
 let last=performance.now();
 function loop(ts){const dt=Math.min(.033,(ts-last)/1000);last=ts;const t=ts/1000;
   if(menuOpen)renderPreviews(t);
-  else{if(!G.paused){if(G.hitstop>0)G.hitstop-=dt;else update(dt)}render(t)}
+  else{try{if(!G.paused){if(G.hitstop>0)G.hitstop-=dt;else update(dt)}render(t)}catch(e){if(!window._ccErr){window._ccErr=1;console.error(e)}}}
   requestAnimationFrame(loop)}
 renderRes();initGame();fade=0;
 if(!netInit())charSelect();else{NET.sb.auth.getSession().then(async({data})=>{if(data&&data.session){try{await netStart(data.session.user)}catch(e){showLogin(authMsg(e))}}else showLogin()}).catch(()=>showLogin())}
