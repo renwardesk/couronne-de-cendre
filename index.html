@@ -386,7 +386,7 @@ function buildTown(){
     w.trig.push({kind:'bld',k,x,y:y+8,r:18});}
   const prop=(n,x,y,sol)=>{w.props.push({type:'spr',n,x,y});if(sol)w.solids.push({x:x-sol[0]/2,y:y-sol[1],w:sol[0],h:sol[1]})};
   prop('c_fountain',360,834,[80,30]);prop('c_bench',290,880,[50,8]);prop('c_bench',430,880,[50,8]);prop('c_well',230,790,[40,14]);prop('c_crate',500,792,[26,10]);prop('c_pot',520,800,[16,8]);
-  prop('c_statue',300,298,[26,10]);prop('c_statue',420,298,[26,10]);
+  prop('c_statue',306,404,[26,10]);prop('c_statue',414,404,[26,10]);
   for(const x of [140,220,500,580])prop('c_pillar',x,632,[20,8]);
   if(S.bld.hall>=3)for(const x of [216,264,456,504])prop('c_pillar',x,292,[20,8]);
   if(S.bld.hall>=5){w.props.push({type:'spr',n:'c_arch',x:360,y:298});w.solids.push({x:319,y:288,w:14,h:10},{x:387,y:288,w:14,h:10})}
@@ -1019,18 +1019,18 @@ const FURN={bed_y:{n:'Lit doré',spr:'f_bed_y',cost:{or:60,bois:40},use:'bed'},b
   shelf:{n:'Grande étagère',spr:'f_shelf',cost:{bois:70}},drawer:{n:'Commode',spr:'f_drawer',cost:{bois:40}},cabinet:{n:'Buffet',spr:'f_cabinet',cost:{bois:30}},wardrobe:{n:'Armoire',spr:'f_wardrobe',cost:{bois:40}},
   plant:{n:'Plante',spr:'f_plant',cost:{or:15}},lamp:{n:'Lampadaire',spr:'f_lamp',cost:{or:25,pierre:10}},clock:{n:'Horloge',spr:'f_clock',cost:{or:60}},rug:{n:'Tapis',spr:'f_rug',cost:{or:30},flat:true},jar:{n:'Jarre',spr:'f_jar',cost:{or:10}},
   cup:{n:'Trophée de boss',spr:'ic_Cup',cost:{or:100},need:true}};
-function estatesBg(){const {o,c}=grassBg(640,480,77);
+function estatesBg(){const {o,c}=grassBg(640,560,77);tileFill(c,'road9',16,16,312,444,16,60);tileFill(c,'road9',16,16,312,496,190,16);
   tileFill(c,'road9',16,16,0,268,640,16);tileFill(c,'road9',16,16,312,60,16,400);
   for(const [x,y] of PLOTS){c.fillStyle='rgba(90,70,40,.18)';c.fillRect(x-60,y-90,120,100);tileFill(c,'road9',16,16,x-8,y+8,16,y<300?268-y-8:268-y)}
   return o}
-function buildEstates(){const w={kind:'town',id:'estates',name:'Domaine des aventuriers',w:640,h:480,bgFn:estatesBg,bg:null,solids:[],trig:[],enemies:[],boss:null,props:[],folk:[]};
+function buildEstates(){const w={kind:'town',id:'estates',name:'Domaine des aventuriers',w:640,h:560,bgFn:estatesBg,bg:null,solids:[],trig:[],enemies:[],boss:null,props:[],folk:[]};
   PLOTS.forEach(([x,y],i)=>{const P=S.plots[i];w.trig.push({kind:'plot',i,x:x+30,y:y+12,r:16});
     if(P.lvl>0){const H=HOUSE[P.lvl],r=AT[H.spr];w.solids.push({x:x-r[2]/2+3,y:y-r[3]*.55,w:r[2]-6,h:r[3]*.55-2});w.trig.push({kind:'house',i,x,y:y+8,r:14,auto:true})}
     for(const [fx,fy] of [[x-60,y-90],[x+56,y-90],[x-60,y+6],[x+56,y+6]])w.props.push({type:'post',x:fx+2,y:fy+4})});
-  w.props.push({type:'spr',n:'h_wood2',x:590,y:120},{type:'spr',n:'m_horse_s',x:560,y:150},{type:'spr',n:'m_horseb_s',x:610,y:156},{type:'spr',n:'barrels',x:540,y:126});
-  w.solids.push({x:560,y:84,w:60,h:34});w.trig.push({kind:'stable',x:590,y:130,r:22});
+  w.props.push({type:'spr',n:'h_wood2',x:530,y:496},{type:'spr',n:'m_horse_s',x:470,y:536},{type:'spr',n:'m_horseb_s',x:590,y:540},{type:'spr',n:'barrels',x:600,y:500});
+  w.solids.push({x:500,y:460,w:60,h:34});w.trig.push({kind:'stable',x:530,y:508,r:22});
   w.trig.push({kind:'exit',to:'capitale',x:636,y:276,r:22,auto:true});
-  seed=8;for(let i=0;i<40;i++){const x=srnd()*640|0,y=srnd()*480|0;if((y>40&&y<460&&x>30&&x<610)||Math.abs(y-276)<30)continue;w.props.push({type:'spr',n:['bigtree_green','tree_round','bigtree_pink'][srnd()*3|0],x,y});w.solids.push({x:x-4,y:y-4,w:8,h:5})}
+  seed=8;for(let i=0;i<40;i++){const x=srnd()*640|0,y=srnd()*560|0;if((y>40&&y<540&&x>30&&x<610)||Math.abs(y-276)<30)continue;w.props.push({type:'spr',n:['bigtree_green','tree_round','bigtree_pink'][srnd()*3|0],x,y});w.solids.push({x:x-4,y:y-4,w:8,h:5})}
   return w}
 function houseBg(H){return()=>{const W=H.w,Hh=H.h,o=cnv(W,Hh),c=o.getContext('2d');c.fillStyle='#1a1410';c.fillRect(0,0,W,Hh);
   tileFill(c,'int_floor',0,0,16,24,W-32,Hh-40,32);
@@ -1304,8 +1304,8 @@ function netJoinZone(){
   if(NET.ch){try{NET.sb.removeChannel(NET.ch)}catch(e){}}
   NET.remote={};NET.zone=key;NET.count=1;
   const ch=NET.sb.channel('cc-z-'+key,{config:{broadcast:{self:false},presence:{key:NET.uid}}});
-  ch.on('broadcast',{event:'st'},({payload})=>{for(const s of payload.p||[]){const o=NET.remote[s.k];if(o){Object.assign(o,s,{t:performance.now()})}else NET.remote[s.k]=Object.assign({rx:s.x,ry:s.y,t:performance.now()},s)}});
-  ch.on('presence',{event:'sync'},()=>{NET.count=Object.keys(ch.presenceState()).length});
+  ch.on('broadcast',{event:'st'},({payload})=>{if(NET.ch!==ch)return;for(const s of payload.p||[]){if(String(s.k).startsWith(NET.uid+':'))continue;const o=NET.remote[s.k];if(o){Object.assign(o,s,{t:performance.now()})}else NET.remote[s.k]=Object.assign({rx:s.x,ry:s.y,t:performance.now()},s)}});
+  ch.on('presence',{event:'sync'},()=>{if(NET.ch!==ch)return;NET.count=Object.keys(ch.presenceState()).length});
   ch.on('presence',{event:'leave'},({key})=>{for(const k in NET.remote)if(k.startsWith(key+':'))delete NET.remote[k]});
   ch.subscribe(s=>{if(s==='SUBSCRIBED'){ch.track({n:NET.pseudo});NET.lastSent=0;NET.lastSig=''}});
   NET.ch=ch;
