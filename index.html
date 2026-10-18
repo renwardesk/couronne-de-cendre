@@ -333,12 +333,12 @@ function iosFix(){/* iPhone installé : la vue est raccourcie de la hauteur de l
   if(navigator.standalone!==true)return;const land=Math.abs(window.orientation||0)===90||innerWidth>innerHeight,h=land?Math.min(screen.width,screen.height):Math.max(screen.width,screen.height);
   for(const el of [document.documentElement,document.body,$('#app')])el.style.height=h+'px'}
 function resize(){iosFix();const r=$('#app').getBoundingClientRect(),dpr=Math.min(3,window.devicePixelRatio||1);
-  const short=Math.min(r.width,r.height),s=Math.max(1,short/270);VW=Math.round(r.width/s);VH=Math.round(r.height/s);
+  const short=Math.min(r.width,r.height),s=Math.max(1,short/ZOOMV);VW=Math.round(r.width/s);VH=Math.round(r.height/s);
   cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);SC=cv.width/VW;
   const cs=getComputedStyle($('#safe'));SAFE={t:parseFloat(cs.paddingTop)/s||0,r:parseFloat(cs.paddingRight)/s||0,b:parseFloat(cs.paddingBottom)/s||0,l:parseFloat(cs.paddingLeft)/s||0};
   const pd=$('.pad'),pr=pd&&getComputedStyle(pd).display!=='none'?pd.getBoundingClientRect():null;
   if(pr){let top=r.height;for(const el of pd.querySelectorAll('.stick')){const q=el.getBoundingClientRect();top=Math.min(top,q.top)}PADTOP=(top-r.top)/s}else PADTOP=VH-SAFE.b;}
-let SAFE={t:0,r:0,b:0,l:0},PADTOP=270;
+let SAFE={t:0,r:0,b:0,l:0},PADTOP=270;const ZOOMV=215;
 addEventListener('resize',resize);addEventListener('orientationchange',()=>setTimeout(resize,250));if(window.visualViewport)visualViewport.addEventListener('resize',resize);resize();addEventListener('load',resize);
 
 /* ===== Dessin des personnages ===== */
@@ -967,8 +967,8 @@ function drawMounted(c,h,s,t){
   const M=MOUNTS[h.mount],x=Math.round(s.x),y=Math.round(s.y),d=dirIdx(s.fx,s.fy),f=s.moving?Math.floor(t*8)%2:0;
   c.fillStyle='rgba(0,0,0,.3)';c.beginPath();c.ellipse(x,y+1,d>1?11:7,3,0,0,7);c.fill();
   const side=d>1;
-  if(!side&&d===1)frame(c,'ch_'+h.look,d,0,16,16,x,y-7);
-  if(side)frame(c,M.side,f,0,M.sw,16,x,y+1,{flip:d===2});else frame(c,M.spr,d===1?1:0,0,16,M.fh,x,y+1-(s.moving?f:0));
+  if(d===1){drawMountBack(c,h.mount,x,y+1-(s.moving?f:0),f);frame(c,'ch_'+h.look,1,0,16,16,x,y-8-(s.moving?f:0));return}
+  if(side)frame(c,M.side,f,0,M.sw,16,x,y+1,{flip:d===2});else frame(c,M.spr,f,0,16,M.fh,x,y+1-(s.moving?f:0));
   if(side||d===0)frame(c,'ch_'+h.look,d,0,16,16,x+(side?(d===2?2:-2):0),y-7-(s.moving?f:0));
 }
 /* ---------- régions ---------- */
@@ -985,12 +985,12 @@ const FURN={bed_y:{n:'Lit doré',spr:'f_bed_y',cost:{or:60,bois:40},use:'bed'},b
   cup:{n:'Trophée de boss',spr:'ic_Cup',cost:{or:100},need:true}};
 function estatesBg(){const {o,c}=grassBg(640,560,77);tileFill(c,'road9',16,16,312,444,16,60);tileFill(c,'road9',16,16,312,496,190,16);
   tileFill(c,'road9',16,16,0,268,640,16);tileFill(c,'road9',16,16,312,60,16,400);
-  for(const [x,y] of PLOTS){c.fillStyle='rgba(90,70,40,.18)';c.fillRect(x-60,y-90,120,100);tileFill(c,'road9',16,16,x-8,y+8,16,y<300?268-y-8:268-y)}
+  for(const [i,[x,y]] of PLOTS.entries()){if(!S.plots[i]||!S.plots[i].lvl){c.fillStyle='rgba(90,70,40,.18)';c.fillRect(x-60,y-90,120,100)}tileFill(c,'road9',16,16,x-8,y+8,16,y<300?268-y-8:268-y)}
   return o}
 function buildEstates(){const w={kind:'town',id:'estates',name:'Domaine des aventuriers',w:640,h:560,bgFn:estatesBg,bg:null,solids:[],trig:[],enemies:[],boss:null,props:[],folk:[]};
   PLOTS.forEach(([x,y],i)=>{const P=S.plots[i];w.trig.push({kind:'plot',i,x:x+30,y:y+12,r:16});
     if(P.lvl>0){const H=HOUSE[P.lvl],r=AT[H.spr];w.solids.push({x:x-r[2]/2+3,y:y-r[3]*.55,w:r[2]-6,h:r[3]*.55-2});w.trig.push({kind:'house',i,x,y:y+8,r:14,auto:true})}
-    for(const [fx,fy] of [[x-60,y-90],[x+56,y-90],[x-60,y+6],[x+56,y+6]])w.props.push({type:'post',x:fx+2,y:fy+4})});
+    if(!P.lvl)for(const [fx,fy] of [[x-60,y-90],[x+56,y-90],[x-60,y+6],[x+56,y+6]])w.props.push({type:'post',x:fx+2,y:fy+4})});
   w.props.push({type:'spr',n:'h_wood2',x:530,y:496},{type:'spr',n:'m_horse_s',x:470,y:536},{type:'spr',n:'m_horseb_s',x:590,y:540},{type:'spr',n:'barrels',x:600,y:500});
   w.solids.push({x:500,y:460,w:60,h:34});w.trig.push({kind:'stable',x:530,y:508,r:22});
   w.trig.push({kind:'exit',to:'capitale',x:636,y:276,r:22,auto:true});
@@ -1066,7 +1066,8 @@ function openCatalog(p){
   const rows=Object.entries(FURN).map(([k,F])=>{const lock=F.need&&!Object.keys(S.wins).length;return `<div class="sk"><canvas data-ic="${F.spr}" width="24" height="24" style="width:24px;height:24px;image-rendering:pixelated"></canvas><div class="t"><b>${F.n}</b> <span class="cost" style="display:inline-flex">${costTxt(F.cost)}</span></div><button class="btn sm" data-f="${k}" ${!lock&&canPay(F.cost)?'':'disabled'}>Acheter</button></div>`}).join('');
   panel(`<h2>Établi</h2><p>Achetez un meuble puis posez-le avec Action, devant votre héros.</p><div class="skills" style="max-width:420px;max-height:46vh;overflow:auto;text-align:left">${rows}</div><button class="btn ghost" id="cl">Fermer</button>`);
   document.querySelectorAll('[data-ic]').forEach(cv=>{const c=cv.getContext('2d'),r=AT[cv.dataset.ic];if(!r)return;c.imageSmoothingEnabled=false;const k=Math.min(24/r[2],24/r[3]);c.drawImage(IMG.atlas,r[0],r[1],r[2],r[3],12-r[2]*k/2,12-r[3]*k/2,r[2]*k,r[3]*k)});
-  document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{const k=b.dataset.f;if(pay(FURN[k].cost)){G.carry={k,p:p.i};closeOv();banner('Posez avec Action')}});
+  document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{const k=b.dataset.f;if(pay(FURN[k].cost)){G.carry={k,p:p.i};closeOv();banner('Action : poser · Roulade : tourner')}});
+  placedList(p);
 }
 function keepPos(w){return w}
 function carryPos(p){const W=world;return{x:clamp(Math.round((p.x+p.fx*18)/8)*8,28,W.w-28),y:clamp(Math.round((p.y+p.fy*14)/8)*8,44,W.h-18)}}
@@ -1786,7 +1787,7 @@ function go(kind,arg){
     if(D){sx=D.x;sy=D.y+26}else if(e){sx=e.x+(e.x<20?44:e.x>LY.w-20?-44:0);sy=e.y+(e.y<20?44:e.y>LY.h-20?-44:0)}else{sx=LY.camp[0];sy=LY.camp[1]+70}
     banner(R.n);music(R.music)}
   if(kind==='estates'){world=buildEstates();if(arg&&arg.plot!=null){sx=PLOTS[arg.plot][0];sy=PLOTS[arg.plot][1]+22}else{sx=600;sy=276}banner(world.name);music('home')}
-  if(kind==='house'){world=buildHouse(arg.plot);sx=world.w/2;sy=world.h-30;banner(world.name);music('home')}
+  if(kind==='house'){world=buildHouse(arg.plot);sx=world.w/2;sy=world.h-30;banner(world.name);music('home');refreshPlot(arg.plot)}
   if(kind==='dungeon'){const {id,idx}=arg,D=DUNGEONS[id];world=buildRoom(id,idx);sx=world.w/2;sy=world.h-30;world.tier=REG[D.region].tier;world.dmul=1+.4*(world.tier-1);
     if(world.tier>1){for(const e of world.enemies){const k=1+.6*(world.tier-1);e.hp=e.maxhp=Math.round(e.maxhp*k);e.lv*=k}}
     if(idx===0||!G.run||G.run.id!==id)G.run={id,loot:{}};if(idx>0)G.players.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxhp,p.hp+p.maxhp*.25)});
@@ -2034,6 +2035,22 @@ function netFurn(i){if(!NET.online)return;NET.furnQ=NET.furnQ||{};NET.furnQ[i]=1
   NET.furnT=setTimeout(async function send(){if(NET.busy){NET.furnT=setTimeout(send,300);return}const ks=Object.keys(NET.furnQ);NET.furnQ={};
     for(const k of ks){const r=await netRpc('cendre_set_furn',{i:+k,f:S.plots[+k].furn});if(r===null){NET.furnQ[k]=1;NET.furnT=setTimeout(send,1500)}}},200)}
 function dropCarryBack(){const c=G&&G.carry;if(!c||!c.orig||c.plot==null)return;const P=S.plots[c.plot];if(!P.furn.some(f=>f.x===c.orig.x&&f.y===c.orig.y&&f.k===c.orig.k))P.furn.push(c.orig);G.carry=null;save();netFurn(c.plot)}
+/* ---------- établi : liste des meubles posés, on peut toujours les ranger ---------- */
+function placedList(p){const P=S.plots[world.plot];if(!P.furn.length)return;
+  const html=`<span class="lbl">Meubles posés · ${P.furn.length}</span><div class="skills" style="max-width:420px;max-height:22vh;overflow:auto;text-align:left">${P.furn.map((f,j)=>`<div class="sk"><div class="t"><b>${FURN[f.k].n}</b> <span>${['','tourné','retourné','tourné'][(f.r||0)%4]}</span></div><button class="btn ghost sm" data-pr="${j}">Ranger</button></div>`).join('')}</div>`;
+  $('#ovp').insertAdjacentHTML('beforeend',html);
+  document.querySelectorAll('[data-pr]').forEach(b=>b.onclick=()=>{const j=+b.dataset.pr,f=P.furn[j];if(!f)return;const F=FURN[f.k];P.furn.splice(j,1);for(const k in F.cost)S.res[k]+=Math.floor(F.cost[k]/2);renderRes();save();netFurn(world.plot);
+    const pos=G.players.map(o=>[o.x,o.y]);world=buildHouse(world.plot);G.players.forEach((o,k)=>{o.x=pos[k][0];o.y=pos[k][1]});sfx('coin',.4);openCatalog(p)})}
+/* ---------- maison : relue sur le serveur à l'entrée ---------- */
+function refreshPlot(i){if(!NET.online||!NET.sb)return;NET.sb.from('cendre_plots').select('*').eq('id',i).maybeSingle().then(r=>{if(!r||!r.data)return;netPlotRow(r.data);
+  if(world&&world.id==='house'&&world.plot===i&&!G.carry){const pos=G.players.map(o=>[o.x,o.y]);world=buildHouse(i);G.players.forEach((o,k)=>{o.x=pos[k][0];o.y=pos[k][1]})}}).catch(()=>{})}
+/* ---------- montures vues de dos ---------- */
+const MBACK={horse:['#b2472e','#6a2414','#3a1a10'],horseb:['#6a6a72','#2c2c34','#16161c'],lion:['#eef2f4','#7fb0c8','#3a4a58']};
+function drawMountBack(c,k,x,y,f){const [b,t,o]=MBACK[k]||MBACK.horse,P=(px_,py,w,h,cc)=>px(c,cc,x-8+px_,y-15+py,w,h);
+  P(4,0,8,1,o);P(2,1,12,1,o);P(1,2,1,9,o);P(14,2,1,9,o);P(2,11,12,1,o);P(4,12,8,1,o);
+  P(2,2,12,9,b);P(4,1,8,1,b);P(4,11,8,1,b);P(3,3,3,2,'rgba(255,255,255,.25)');
+  const sw=f?1:0;P(7+sw,6,2,7,t);P(7+sw,13,2,2,t);P(6+sw,14,1,1,o);P(9+sw,14,1,1,o);
+  P(3,12+(f?0:1),2,3,o);P(11,12+(f?1:0),2,3,o)}
 
 migrate12(S);
 /* ===== Interface ===== */
@@ -2068,7 +2085,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='13.2';
+const VERSION='13.3';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
