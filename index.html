@@ -162,6 +162,7 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
 .ov,#chars .panel,.qlist,.looks{touch-action:pan-y}
 @media (max-width:600px){.top{max-width:84%;gap:4px}.chip{font-size:12px;border-width:6px;border-image-width:6px;gap:3px;padding:0 1px}.chip .pip{width:6px;height:6px}}
 .chwrap{display:flex;flex-direction:column;gap:4px}.chdel{font:inherit;font-size:12px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:3px 6px;cursor:pointer}.chdel.arm{color:#fff;background:#8a2a1c;border-color:#d65a3c}
+.musics{display:flex;flex-direction:column;gap:6px}.mrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:6px}.mrow b{min-width:150px}.mrow .mn{flex:1;color:var(--muted);font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 </style>
 </head>
@@ -198,6 +199,7 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
         <div class="seg" id="mode"><button data-m="solo">1 joueur</button><button data-m="local">2 joueurs</button></div>
       </div>
       <div class="heroes" id="heroes"></div>
+      <div class="musics" id="musics"></div>
       <div class="keys">
         <span class="lbl">Commandes</span>
         <span>Joueur 1 : <kbd>Z Q S D</kbd> bouger · <kbd>J</kbd> frapper · <kbd>K</kbd> ou <kbd>Espace</kbd> roulade · <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd> techniques · <kbd>E</kbd> action · <kbd>M</kbd> monture · <kbd>B</kbd> sac · <kbd>N</kbd> carte · <kbd>H</kbd> ce menu</span>
@@ -251,7 +253,7 @@ function loadBuf(k,url){if(AU.buf[k]!==undefined)return AU.buf[k];AU.buf[k]=fetc
 function sfx(n,v=.45){const b=AU.ctx&&AU.buf['s_'+n];if(!b||b.then)return;try{const s=AU.ctx.createBufferSource(),g=AU.ctx.createGain();s.buffer=b;g.gain.value=v;s.connect(g);g.connect(AU.master);s.start()}catch(e){}}
 async function music(n){AU.want=n;if(!AU.ctx||AU.cur===n)return;AU.cur=n;
   if(AU.src){const o=AU.src,og=AU.g;try{og.gain.linearRampToValueAtTime(0,AU.ctx.currentTime+.6);o.stop(AU.ctx.currentTime+.65)}catch(e){}AU.src=null}
-  let b=await loadBuf('m_'+n,'snd/m_'+n+'.ogg');if(AU.cur!==n||!b)return;
+  let b=(await custBuf(n))||await loadBuf('m_'+n,'snd/m_'+n+'.ogg');if(AU.cur!==n||!b)return;
   const s=AU.ctx.createBufferSource(),g=AU.ctx.createGain();s.buffer=b;s.loop=true;g.gain.value=0;g.gain.linearRampToValueAtTime(.32,AU.ctx.currentTime+1);s.connect(g);g.connect(AU.master);s.start();AU.src=s;AU.g=g}
 function setMute(m){AU.muted=m;try{localStorage.setItem('cc-mute',m?'1':'0')}catch(e){}if(AU.master)AU.master.gain.value=m?0:1;const b=document.querySelector('#bMute');if(b)b.textContent=m?'Son coupé':'Son'}
 
@@ -2012,6 +2014,19 @@ function townExtra(w){
   w.props=w.props.filter(p=>!(p.type==='spr'&&p.x<70&&Math.abs(p.y-950)<30));
   w.trig.push({kind:'exit',to:'estates',x:4,y:950,r:22,auto:true});
   w.props.push({type:'spr',n:'n_sign',x:46,y:928});w.trig.push({kind:'tsign',x:46,y:938,r:16})}
+/* ---------- musiques personnelles (fichiers du joueur, gardés sur son appareil) ---------- */
+const MSLOTS=[['town','Cité et domaine'],['field','Régions'],['dungeon','Donjons'],['crypt','Crypte et grotte de cristal'],['boss','Combats de boss']];
+function idb(){return new Promise((ok,ko)=>{const r=indexedDB.open('cc-music',1);r.onupgradeneeded=()=>r.result.createObjectStore('m');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)})}
+async function idbGet(k){try{const d=await idb();return await new Promise(ok=>{const q=d.transaction('m').objectStore('m').get(k);q.onsuccess=()=>ok(q.result||null);q.onerror=()=>ok(null)})}catch(e){return null}}
+async function idbSet(k,v){const d=await idb();return new Promise((ok,ko)=>{const t=d.transaction('m','readwrite');if(v==null)t.objectStore('m').delete(k);else t.objectStore('m').put(v,k);t.oncomplete=()=>ok();t.onerror=()=>ko(t.error)})}
+AU.cust={};
+function custBuf(n){if(AU.cust[n]!==undefined)return AU.cust[n];AU.cust[n]=idbGet(n).then(v=>v&&v.data?new Promise((ok,ko)=>AU.ctx.decodeAudioData(v.data.slice(0),ok,ko)):null).then(b=>AU.cust[n]=b).catch(()=>AU.cust[n]=null);return AU.cust[n]}
+async function renderMusics(){const el=$('#musics');if(!el)return;
+  const rows=await Promise.all(MSLOTS.map(async([k,n])=>{const v=await idbGet(k);return `<div class="mrow"><b>${n}</b><span class="mn">${v?esc(v.name):'musique du jeu'}</span><label class="btn ghost sm">Choisir<input type="file" accept="audio/*" data-m="${k}" hidden></label>${v?`<button class="btn ghost sm" data-mr="${k}">Retirer</button>`:''}</div>`}));
+  el.innerHTML=`<span class="lbl">Musiques personnelles</span><p class="note">Choisissez vos propres fichiers audio (mp3, m4a, ogg…) : ils restent sur cet appareil et remplacent la musique du jeu dans chaque lieu.</p>${rows.join('')}<p class="note" id="mmsg"></p>`;
+  el.querySelectorAll('input[data-m]').forEach(inp=>inp.onchange=async()=>{const f=inp.files[0];if(!f)return;const k=inp.dataset.m;$('#mmsg').textContent='Chargement de '+f.name+'…';
+    try{const data=await f.arrayBuffer();await idbSet(k,{name:f.name,data});AU.cust[k]=undefined;audioInit();if(AU.cur===k){AU.cur=null;music(k)}$('#mmsg').textContent='Musique enregistrée.'}catch(e){$('#mmsg').textContent='Impossible d\'enregistrer ce fichier.'}renderMusics()});
+  el.querySelectorAll('[data-mr]').forEach(b=>b.onclick=async()=>{const k=b.dataset.mr;await idbSet(k,null);AU.cust[k]=undefined;if(AU.cur===k){AU.cur=null;music(k)}renderMusics()})}
 
 migrate12(S);
 /* ===== Interface ===== */
@@ -2022,7 +2037,7 @@ const prev=[];
 function lookCanvas(id){const o=cnv(32,32),c=o.getContext('2d');c.imageSmoothingEnabled=false;const draw=()=>{c.clearRect(0,0,32,32);c.setTransform(2,0,0,2,0,0);frame(c,'ch_'+id,0,0,16,16,8,16)};if(ready(IMG.atlas))draw();else IMG.atlas.addEventListener('load',draw);return o}
 function renderMode(){return;document.querySelectorAll('#mode button').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.m===S.mode);b.onclick=()=>{S.mode=b.dataset.m;save();renderMode();
   const keep=G.players[0];G.players=[mkPlayer(0,false)];if(S.mode==='local')G.players.push(mkPlayer(1,false));G.players.forEach((p,i)=>{p.x=keep.x+(i?14:0);p.y=keep.y})}})}
-function openMenu(){menuOpen=true;$('#sheet').hidden=false;const ac=$('#acct');ac.innerHTML=NET.online?`<span class="lbl">Compte</span><span>${NET.pseudo}</span><button class="btn ghost sm" id="lout">Se déconnecter</button>`:NET.sb?`<span class="lbl">Compte</span><span class="note">Hors ligne</span><button class="btn sm" id="lin">Se connecter</button>`:'';const lo=$('#lout');if(lo)lo.onclick=netLogout;const li=$('#lin');if(li)li.onclick=()=>{closeMenu();showLogin()};$('#reset').hidden=NET.online;renderHeroes();renderMode();K={}}
+function openMenu(){menuOpen=true;$('#sheet').hidden=false;const ac=$('#acct');ac.innerHTML=NET.online?`<span class="lbl">Compte</span><span>${NET.pseudo}</span><button class="btn ghost sm" id="lout">Se déconnecter</button>`:NET.sb?`<span class="lbl">Compte</span><span class="note">Hors ligne</span><button class="btn sm" id="lin">Se connecter</button>`:'';const lo=$('#lout');if(lo)lo.onclick=netLogout;const li=$('#lin');if(li)li.onclick=()=>{closeMenu();showLogin()};$('#reset').hidden=NET.online;renderMusics();renderHeroes();renderMode();K={}}
 function closeMenu(){menuOpen=false;$('#sheet').hidden=true;K={};KP={};resize()}
 $('#bHeroes').onclick=openMenu;$('#bBag').onclick=()=>openBag();$('#bMap').onclick=openMap;$('#mapClose').onclick=closeMap;$('#bClose').onclick=closeMenu;
 const app=$('#app'),fsBtn=$('#bFull');
@@ -2046,7 +2061,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='13.0';
+const VERSION='13.1';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
