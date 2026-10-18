@@ -2850,8 +2850,8 @@ const tI=(T,x,y)=>y*T.tw+x,tIn=(T,x,y)=>x>=0&&y>=0&&x<T.tw&&y<T.th;
 function tShape(T,cx,cy,rx,ry,fn,rough=.22,sd=0){const x0=Math.max(0,Math.floor(cx-rx*1.5)),x1=Math.min(T.tw-1,Math.ceil(cx+rx*1.5)),y0=Math.max(0,Math.floor(cy-ry*1.5)),y1=Math.min(T.th-1,Math.ceil(cy+ry*1.5));
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const a=Math.atan2(y-cy,x-cx),k=1+rough*(Math.sin(a*3+sd)*.55+Math.sin(a*5+sd*2.3)*.3+Math.sin(a*9+sd*1.7)*.15);
     if(((x-cx)/(rx*k))**2+((y-cy)/(ry*k))**2<1)fn(tI(T,x,y),x,y)}}
-function tRaise(T,cx,cy,rx,ry,L,o={}){tShape(T,cx,cy,rx,ry,i=>{if(T.h[i]<L){T.h[i]=L;if(o.sty!=null)T.s[i]=RSTY[o.sty]}if(o.k!=null)T.k[i]=o.k},o.rough??.22,o.sd||cx)}
-function tLower(T,cx,cy,rx,ry,L,o={}){tShape(T,cx,cy,rx,ry,i=>{if(T.h[i]>L)T.h[i]=L;if(o.k!=null)T.k[i]=o.k;if(o.sty!=null)T.s[i]=RSTY[o.sty]},o.rough??.22,o.sd||cy)}
+function tRaise(T,cx,cy,rx,ry,L,o={}){tShape(T,cx,cy,rx,ry,i=>{if(T.h[i]<L){T.h[i]=L;if(o.sty!=null)T.s[i]=RSTY[o.sty]}if(o.k!=null)T.k[i]=o.k},o.rough??.15,o.sd||cx)}
+function tLower(T,cx,cy,rx,ry,L,o={}){tShape(T,cx,cy,rx,ry,i=>{if(T.h[i]>L)T.h[i]=L;if(o.k!=null)T.k[i]=o.k;if(o.sty!=null)T.s[i]=RSTY[o.sty]},o.rough??.15,o.sd||cy)}
 function tKind(T,cx,cy,rx,ry,k,o={}){tShape(T,cx,cy,rx,ry,i=>{T.k[i]=k},o.rough??.2,o.sd||cx+cy)}
 function tNorth(T,L,yf,o={}){for(let x=0;x<T.tw;x++){const e=Math.round(yf(x));for(let y=0;y<Math.min(T.th,e);y++){const i=tI(T,x,y);if(T.h[i]<L){T.h[i]=L;if(o.sty!=null)T.s[i]=RSTY[o.sty]}}}}
 function tRect(T,x0,y0,w,h,fn){for(let y=Math.max(0,y0);y<Math.min(T.th,y0+h);y++)for(let x=Math.max(0,x0);x<Math.min(T.tw,x0+w);x++)fn(tI(T,x,y),x,y)}
@@ -2876,8 +2876,23 @@ function tRamp(T,x,y,w=3,type='ramp'){const {tw,th,h}=T;
     const r={x:xx,y:yy+1,w,L,type,sty:T.s[tI(T,xx,yy)]};T.ramps.push(r);return r}
   return null}
 /* chemins : polylignes en cases, largeur 3, sans couper falaises, eau, murs */
-function tPath(T,pts,wd=3){for(let s=0;s<pts.length-1;s++){const [ax,ay]=pts[s],[bx,by]=pts[s+1],n=Math.ceil(Math.hypot(bx-ax,by-ay)*2);
-  for(let j=0;j<=n;j++){const px_=ax+(bx-ax)*j/n,py_=ay+(by-ay)*j/n;for(let dy=-1;dy<wd-1;dy++)for(let dx=-1;dx<wd-1;dx++){const x=Math.round(px_+dx),y=Math.round(py_+dy);if(!tIn(T,x,y))continue;const i=tI(T,x,y);if(T.k[i]===TK.G)T.k[i]=TK.PATH}}}}
+function tCliff(T){const {tw,th,h,k}=T,C=new Uint8Array(T.n);for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const i=y*tw+x;if(k[i]===TK.RAMP||k[i]===TK.BRIDGE)continue;for(let j=1;j<=CH;j++){if(y-j<0)break;const u=i-j*tw;if(h[u]>h[i]&&k[u]!==TK.BRIDGE){C[i]=1;break}}}return T.cl=C}
+function tPass(T,i){const q=T.k[i];return !(q===TK.WATER||q===TK.VOID||q===TK.WALL||q===TK.HEDGE)&&!T.cl[i]}
+function tEl(T,i){return T.k[i]===TK.BRIDGE?0:T.h[i]}
+/* itinéraire le plus court sur la grille (A*) : ne change d'étage que par une rampe */
+function tRoute(T,ax,ay,bx,by){const {tw,th,n}=T;if(!T.cl)tCliff(T);const near=(x,y)=>{x=clamp(Math.round(x),0,tw-1);y=clamp(Math.round(y),0,th-1);for(let r=0;r<8;r++)for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){const a=x+dx,b=y+dy;if(tIn(T,a,b)&&tPass(T,tI(T,a,b)))return tI(T,a,b)}return -1};
+  const s=near(ax,ay),g=near(bx,by);if(s<0||g<0)return null;const gx=g%tw,gy=(g/tw)|0;
+  const G_=new Float32Array(n).fill(1e9),P=new Int32Array(n).fill(-1),C_=new Uint8Array(n),H=[];const push=(i,f)=>{H.push([f,i]);let j=H.length-1;while(j>0){const q=(j-1)>>1;if(H[q][0]<=H[j][0])break;[H[q],H[j]]=[H[j],H[q]];j=q}};
+  const pop=()=>{const top=H[0],last=H.pop();if(H.length){H[0]=last;let j=0;for(;;){const l=2*j+1,r=l+1;let m=j;if(l<H.length&&H[l][0]<H[m][0])m=l;if(r<H.length&&H[r][0]<H[m][0])m=r;if(m===j)break;[H[m],H[j]]=[H[j],H[m]];j=m}}return top};
+  G_[s]=0;push(s,0);let it=0;
+  while(H.length&&it++<200000){const [,i]=pop();if(i===g)break;if(C_[i])continue;C_[i]=1;const x=i%tw,y=(i/tw)|0;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const a=x+dx,b=y+dy;if(!tIn(T,a,b))continue;const j=b*tw+a;if(C_[j]||!tPass(T,j))continue;
+      const ei=tEl(T,i),ej=tEl(T,j);if(ei!==ej&&!((T.k[i]===TK.RAMP||T.k[j]===TK.RAMP)&&Math.abs(ei-ej)<=1))continue;
+      const c=G_[i]+(T.k[j]===TK.PATH?.6:1)+(dx!==0&&P[i]>=0&&P[i]===i-dx?0:.15);if(c<G_[j]){G_[j]=c;P[j]=i;push(j,c+Math.abs(a-gx)+Math.abs(b-gy))}}}
+  if(P[g]<0&&s!==g)return null;const out=[];for(let i=g;i>=0;i=P[i]){out.push(i);if(i===s)break}return out.reverse()}
+function tPath(T,pts,wd=3){T.cl=null;tCliff(T);T.bad=T.bad||[];
+  for(let s_=0;s_<pts.length-1;s_++){const [ax,ay]=pts[s_],[bx,by]=pts[s_+1],R_=tRoute(T,ax,ay,bx,by);if(!R_){T.bad.push([ax,ay,bx,by]);continue}
+    for(const i of R_){const x=i%T.tw,y=(i/T.tw)|0;for(let dy=-1;dy<wd-1;dy++)for(let dx=-1;dx<wd-1;dx++){const a=x+dx,b=y+dy;if(!tIn(T,a,b))continue;const j=tI(T,a,b);if(T.k[j]===TK.G&&!T.cl[j]&&tEl(T,j)===tEl(T,i))T.k[j]=TK.PATH}}}}
 /* labyrinthe de haies : grille de couloirs (3) et murs (2) */
 function tMaze(T,x0,y0,mw,mh,kind,o={}){const R=T.R,S=5,vis=new Uint8Array(mw*mh),L=o.L??T.h[tI(T,x0,y0)];
   tRect(T,x0,y0,mw*S+2,mh*S+2,(i)=>{T.h[i]=L;T.k[i]=kind;if(o.ws!=null)T.ws[i]=RSTY[o.ws]});
@@ -2943,7 +2958,7 @@ function terChunk(T,cx,cy){const o=cnv(CW,CW),c=o.getContext('2d');c.imageSmooth
   for(let L=T.minH+1;L<=T.maxH;L++){
     for(let y=b0;y<=b1;y++)for(let x=a0;x<=a1;x++){const i=tI(T,x,y);if(h[i]>=L||k[i]===TK.BRIDGE)continue;let q=0;for(let j=1;j<=CH;j++){if(y-j<0)break;if(h[i-j*tw]>=L){q=j;break}}if(!q)continue;
       if(k[i]===TK.RAMP)continue;const own=tI(T,x,y-q),st=s[own];
-      const cl=xx=>tIn(T,xx,y)&&h[tI(T,xx,y)]<L&&k[tI(T,xx,y)]!==TK.RAMP&&ge(xx,y-q,L);
+      const cl=xx=>{if(!tIn(T,xx,y))return false;const j=tI(T,xx,y);if(h[j]>=L||k[j]===TK.RAMP||k[j]===TK.BRIDGE)return false;for(let z=1;z<=CH;z++){if(y-z<0)break;if(h[j-z*tw]>=L)return true}return false};
       const cc=cl(x-1)&&cl(x+1)?5:cl(x+1)?4:cl(x-1)?6:5;rTile(c,st,cc,q===1?0:2,x*16,y*16)}
     for(let y=b0;y<=b1;y++)for(let x=a0;x<=a1;x++){const i=tI(T,x,y);if(h[i]!==L||k[i]===TK.VOID||k[i]===TK.BRIDGE)continue;
       const n_=ge(x,y-1,L),w_=ge(x-1,y,L),e_=ge(x+1,y,L),st=s[i],X=x*16,Y=y*16;
@@ -2952,12 +2967,8 @@ function terChunk(T,cx,cy){const o=cnv(CW,CW),c=o.getContext('2d');c.imageSmooth
       if(k[i]===TK.PLANK){const pk=(a,b)=>K(a,b)===TK.PLANK;nine(c,9,0,pk(x,y-1),pk(x,y+1),pk(x-1,y),pk(x+1,y),X,Y)}}
     /* rampes de cet étage */
     for(const r of T.ramps){if(r.L!==L)continue;if(r.x*16>X0+CW||(r.x+r.w)*16<X0||r.y*16>Y0+CW||(r.y+CH)*16<Y0)continue;
-      for(let q=0;q<CH;q++){const Y=(r.y+q)*16,row=q===0?0:2;
-        if(r.type==='ladder'){const lc=r.sty===RSTY.snow||r.sty===RSTY.ice||r.sty===RSTY.stone?12:13;for(let dx=0;dx<r.w;dx++){rTile(c,r.sty,5,q===0?0:2,(r.x+dx)*16,Y)}c.drawImage(IMG.relief,lc*16,(RXB+(q===0?0:2))*16,16,16,(r.x+(r.w>>1))*16,Y,16,16);continue}
-        for(let dx=0;dx<r.w;dx++){const X=(r.x+dx)*16;if(r.w===1){rTile(c,r.sty,7,row,X,Y);continue}
-          if(dx===0){rTile(c,r.sty,7,row,X,Y,0,8);rTile(c,r.sty,7,row,X-4,Y,12,4);c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X+8,Y,8,16)}
-          else if(dx===r.w-1){rTile(c,r.sty,7,row,X,Y,8,8);c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X,Y,8,16)}
-          else{c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X,Y,8,16);c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X+8,Y,8,16)}}}}}
+      if(r.type==='ladder'){for(let q=0;q<CH;q++){const Y=(r.y+q)*16,lc=r.sty===RSTY.snow||r.sty===RSTY.ice||r.sty===RSTY.stone?12:13;for(let dx=0;dx<r.w;dx++)rTile(c,r.sty,5,q===0?0:2,(r.x+dx)*16,Y);c.drawImage(IMG.relief,lc*16,(RXB+(q===0?0:2))*16,16,16,(r.x+(r.w>>1))*16,Y,16,16)}continue}
+      drawSteps(c,r)}}
   /* 3. murs (pierre, grès) et haies */
   for(let y=b0;y<=b1;y++)for(let x=a0;x<=a1;x++){const i=tI(T,x,y),q=k[i],X=x*16,Y=y*16;
     if(q===TK.WALL){const wq=(a,b)=>K(a,b)===TK.WALL,n_=wq(x,y-1),s_=wq(x,y+1),w_=wq(x-1,y),e_=wq(x+1,y),st=T.ws[i];
@@ -2965,6 +2976,15 @@ function terChunk(T,cx,cy){const o=cnv(CW,CW),c=o.getContext('2d');c.imageSmooth
     else if(q===TK.HEDGE){const hq=(a,b)=>K(a,b)===TK.HEDGE;nine(c,T.hedge||0,0,hq(x,y-1),hq(x,y+1),hq(x-1,y),hq(x+1,y),X,Y)}}
   if(T.shade){c.fillStyle=T.shade;c.fillRect(X0,Y0,CW,CW)}
   return o}
+/* escalier naturel taillé dans la falaise */
+const STEPC={0:['#e8eff4','#a8bccb','#6f8798'],1:['#f2cf98','#c8925e','#8e5e3e'],2:['#c4b08e','#8c7458','#5e4a36'],3:['#a99878','#74624a','#4c3e2e'],4:['#b8b8ac','#86867c','#5a5a52'],5:['#c88850','#8a5530','#5a3820'],6:['#ecd6a4','#c8a46c','#90704a'],7:['#d8eef6','#98c0d0','#5e8496'],8:['#a8c070','#6a8a44','#3e5a2a']};
+function drawSteps(c,r){const X=r.x*16,Y=r.y*16,W=r.w*16,Hh=CH*16,[A,B,E]=STEPC[r.sty]||STEPC[2],n=5,sh=Hh/n;
+  c.fillStyle=E;c.fillRect(X,Y,W,Hh);
+  for(let i=0;i<n;i++){const y0=Math.round(Y+i*sh),y1=Math.round(Y+(i+1)*sh),ins=1+(i%2);
+    c.fillStyle=A;c.fillRect(X+ins,y0,W-2*ins,y1-y0-2);c.fillStyle=B;c.fillRect(X+ins,y1-2,W-2*ins,2);
+    c.fillStyle='rgba(255,255,255,.25)';c.fillRect(X+ins,y0,W-2*ins,1);
+    for(let s=0;s<3;s++){const sx=X+ins+2+(hsh(r.x+s,r.y+i,21)*(W-2*ins-6)|0);c.fillStyle=B;c.fillRect(sx,y0+2,2,1)}}
+  c.fillStyle=E;c.fillRect(X,Y,1,Hh);c.fillRect(X+W-1,Y,1,Hh);c.fillStyle='rgba(0,0,0,.18)';c.fillRect(X,Y+Hh-1,W,1)}
 /* ---------- miniature (carte, et en attendant qu'un morceau soit prêt) ---------- */
 function terMini(T){const s=4,o=cnv(T.tw*s,T.th*s),c=o.getContext('2d'),M=T.mini;const {tw,th,h,k}=T;
   for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const i=y*tw+x,q=k[i],v=h[i];let col;
@@ -3084,7 +3104,7 @@ pics(){const T=Ter('pics',TW_,TH_,{sty:'snow',ground:['f_white','f_white'],road:
     packs:[[38,158],[30,170],[97,122],[210,52],[244,60],[150,166],[56,40],[260,110]],
     deco:[['torii',150,164],['tower_w',55,30],['c_tent',36,156],['c_tent',46,164]]};
   return T}};
-function terOf(id){if(TERC[id])return TERC[id];const T=TDEF[id]();tCol(T);
+function terOf(id){if(TERC[id])return TERC[id];const T=TDEF[id]();tCliff(T);tCol(T);
   let mn=99,mx=-99;for(let i=0;i<T.n;i++){mn=Math.min(mn,T.h[i]);mx=Math.max(mx,T.h[i])}T.minH=mn;T.maxH=mx;
   return TERC[id]=T}
 /* ---------- nouvelles dimensions et lieux ---------- */
