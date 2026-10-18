@@ -415,7 +415,7 @@ function townBg(){
   const st=(x,y,w,h)=>pave(c,x,y,w,h,x*7+y);
   /* rues pavées */
   st(336,300,48,340);st(336,672,48,368);
-  st(72,584,576,28);st(64,936,592,28);
+  st(72,584,576,28);st(64,936,592,28);st(0,936,64,28);
   st(152,560,32,24);st(536,560,32,24);st(152,920,32,16);st(536,920,32,16);
   st(104,612,32,28);st(584,612,32,28);st(104,672,32,264);st(584,672,32,264);
   /* place de la fontaine et parvis du château */
@@ -468,7 +468,7 @@ function drawWalls(c){
   const hl=S.bld.hall;
   if(hl>=3){crenWall(c,16,340,300,8);crenWall(c,381,704,300,8)}
   if(hl>=4){crenWall(c,16,100,640,8);crenWall(c,141,340,640,8);crenWall(c,381,580,640,8);crenWall(c,621,704,640,8)}
-  if(hl>=2){crenWall(c,8,16,1040,330);crenWall(c,704,712,1040,330);crenWall(c,8,328,1038,14);crenWall(c,392,712,1038,14);stoneTower(c,318,1042,34,hl>=4?'#3b5f8a':null);stoneTower(c,402,1042,34,hl>=4?'#3b5f8a':null)}
+  if(hl>=2){crenWall(c,8,16,930,220);crenWall(c,8,16,1040,72);crenWall(c,704,712,1040,330);crenWall(c,8,328,1038,14);crenWall(c,392,712,1038,14);stoneTower(c,318,1042,34,hl>=4?'#3b5f8a':null);stoneTower(c,402,1042,34,hl>=4?'#3b5f8a':null)}
   else{px(c,'#6a4a2a',386,1010,2,14);px(c,'#a07a4a',378,1004,18,8)}
 }
 function drawBld(c,k,x,y,l,t){
@@ -650,7 +650,7 @@ function updPlayer(p,dt){
     if(p.mounted&&((inp.atk&&!pr.atk)||(inp.s1&&!pr.s1)||(inp.s2&&!pr.s2)||(inp.s3&&!pr.s3))&&world.kind!=='town'){p.mounted=false;addFx('fx_smoke',p.x,p.y-6,6,32,32,.3)}
     const sp=(p.atkT>0?38:88)*p.spd*(p.slowT>0?.55:1)*(p.spdB||1)*(p.mounted?MOUNTS[p.h.mount].spd:1);move(p,mx*sp*dt,my*sp*dt);
     p.st=Math.min(p.maxst,p.st+(p.atkT>0?8:30)*dt);
-    if(G.carry&&inp.roll&&!pr.roll){}
+    if(G.carry&&inp.roll&&!pr.roll){G.carry.rot=((G.carry.rot||0)+1)%4;sfx('roll',.2)}
     else if(p.mounted){}
     else if(inp.roll&&!pr.roll&&p.st>=25*p.rollK){p.st-=25*p.rollK;p.rollT=.32;p.ghostT=1.2;p.harv=null;sfx('roll',.2);const n=Math.hypot(mx,my);if(n>.15){p.rdx=mx/n;p.rdy=my/n}else{p.rdx=p.fx;p.rdy=p.fy}burst(p.x,p.y+3,'#8a7a60',4)}
     else if(inp.s1&&!pr.s1)skill(p,0);
@@ -869,7 +869,7 @@ function render(t){
   if(world.boss&&world.boss.hp>0)L.push({y:world.boss.y,f:()=>drawBoss(c,world.boss,t)});
   for(const p of G.players)L.push({y:p.y,f:()=>{if(p.reflectT>0||p.parryT>0){c.strokeStyle=p.reflectT>0?'rgba(190,230,255,.85)':'rgba(255,255,255,.9)';c.lineWidth=1;c.beginPath();c.arc(p.x,p.y-7,13,0,7);c.stroke()}if(p.buffT>0&&Math.random()<.3)G.parts.push({x:p.x+rnd(-6,6),y:p.y-4,vx:0,vy:-30,t:.4,col:'#ffb070'});if(p.guardT>0){c.strokeStyle='rgba(220,174,76,.7)';c.lineWidth=1;c.beginPath();c.ellipse(p.x,p.y-7,10,13,0,0,7);c.stroke()}drawHero(c,p.h,p,t);drawStatus(c,p,t)}});
   netDraw(L,c,t);
-  if(G.carry&&world.id==='house'){const q=carryPos(G.players[G.carry.p]||G.players[0]),F=FURN[G.carry.k];L.push({y:q.y,f:()=>{c.globalAlpha=.6+.2*Math.sin(t*6);spr(c,F.spr,q.x,q.y+2);c.globalAlpha=1;c.strokeStyle='#9fd4f0';c.strokeRect(q.x-8.5,q.y-1.5,17,4)}})}
+  if(G.carry&&world.id==='house'){const f=carryFurn(G.players[0]),g=furnGeo(f);L.push({y:g.bot,f:()=>{drawFurn(c,f,.6+.2*Math.sin(t*6));c.strokeStyle='#9fd4f0';c.strokeRect(g.x0+.5,g.y0+.5,g.sw,g.sh)}})}
   if(world.id==='estates')PLOTS.forEach(([x,y],i)=>{const P=S.plots[i];L.push({y:y+12,f:()=>{px(c,'#6a4a2a',x+29,y,2,12);px(c,P.owner<0?'#c8a868':'#9fd4f0',x+22,y-6,16,9);px(c,'#3a2614',x+24,y-4,12,1);px(c,'#3a2614',x+24,y-2,9,1)}});if(P.lvl>0)L.push({y,f:()=>{spr(c,HOUSE[P.lvl].spr,x,y+2);if(P.owner>=0)px(c,plotMine(P)?'#3b6ea8':'#c94a3a',x+20,y-HOUSE[P.lvl].h*0+(-40),6,4)}})});
   L.sort((a,b)=>a.y-b.y).forEach(i=>i.f());
   for(const p of G.players)if(p.down){c.strokeStyle='#a8e08a';c.lineWidth=2;c.beginPath();c.arc(p.x,p.y-4,12,-1.57,-1.57+6.28*p.rev/2);c.stroke()}
@@ -886,7 +886,7 @@ function render(t){
   if(world.id==='capital'){for(let k=0;k<4;k++){const a=t*3+k*1.7;if(Math.sin(a*2.3)>.6)px(c,'#ffffff',346+((k*13+Math.floor(a*3))%28),812+((k*7)%14),1,1)}}
   drawLighting(c,ox,oy,t);
   const p0=G.players[0],tr=nearTrig(p0);
-  if(G.carry&&world.id==='house'){txt(c,'Action : poser le meuble',p0.x,p0.y-34,'#9fd4f0','9px "Alegreya Sans", sans-serif','center')}
+  if(G.carry&&world.id==='house'){txt(c,'Action : poser · Roulade : tourner',p0.x,p0.y-34,'#9fd4f0','9px "Alegreya Sans", sans-serif','center')}
   if(tr&&!G.carry){const s=trigLabel(tr)+' — Action';c.font='9px "Alegreya Sans", sans-serif';const w=c.measureText(s).width+12;
     px(c,'#241c16',p0.x-w/2+2,p0.y-42,w-4,12);nine(c,IMG.frame,p0.x-w/2-3,p0.y-47,w+6,22,8);txt(c,s,p0.x,p0.y-33,'#f2e2b8','9px "Alegreya Sans", sans-serif','center')}
   c.restore();
@@ -1002,12 +1002,6 @@ function houseBg(H){return()=>{const W=H.w,Hh=H.h,o=cnv(W,Hh),c=o.getContext('2d
     d(0,80-s,s,s,0,Hh-s,s,s);d(80-s,80-s,s,s,W-s,Hh-s,s,s);for(let x=s;x<W-s;x+=48)d(s,80-s,48,s,x,Hh-s,Math.min(48,W-s-x),s)}
   c.fillStyle='#2a1a10';c.fillRect(W/2-14,Hh-16,28,16);c.fillStyle='#4a3020';c.fillRect(W/2-12,Hh-14,24,14);
   c.fillStyle='rgba(0,0,0,.25)';c.fillRect(16,24,W-32,4);return o}}
-function buildHouse(i){const P=S.plots[i],H=HOUSE[P.lvl];
-  const w={kind:'town',id:'house',plot:i,name:H.n+' de '+plotName(P),w:H.w,h:H.h,bgFn:houseBg(H),bg:null,solids:[{x:0,y:0,w:H.w,h:26},{x:0,y:0,w:16,h:H.h},{x:H.w-16,y:0,w:16,h:H.h},{x:0,y:H.h-10,w:H.w/2-16,h:10},{x:H.w/2+16,y:H.h-10,w:H.w/2,h:10}],trig:[],enemies:[],boss:null,props:[],folk:[]};
-  w.props.push({type:'spr',n:'f_bench',x:46,y:56});w.solids.push({x:22,y:40,w:48,h:16});w.trig.push({kind:'bench',x:46,y:66,r:16});
-  P.furn.forEach((f,j)=>{const F=FURN[f.k],r=AT[F.spr];w.props.push({type:F.flat?'flat':'spr',n:F.spr,x:f.x,y:f.y,fi:j});if(!F.flat&&r)w.solids.push({x:f.x-r[2]/2+2,y:f.y-Math.min(10,r[3]*.4),w:r[2]-4,h:Math.min(10,r[3]*.4)});w.trig.push({kind:'furn',j,x:f.x,y:f.y+6,r:14})});
-  w.trig.push({kind:'exit',to:'estates',x:H.w/2,y:H.h-2,r:14,auto:true,plot:i});
-  return w}
 
 /* ---------- déplacements entre scènes ---------- */
 function travel(to,from){
@@ -1072,18 +1066,8 @@ function openCatalog(p){
   document.querySelectorAll('[data-ic]').forEach(cv=>{const c=cv.getContext('2d'),r=AT[cv.dataset.ic];if(!r)return;c.imageSmoothingEnabled=false;const k=Math.min(24/r[2],24/r[3]);c.drawImage(IMG.atlas,r[0],r[1],r[2],r[3],12-r[2]*k/2,12-r[3]*k/2,r[2]*k,r[3]*k)});
   document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{const k=b.dataset.f;if(pay(FURN[k].cost)){G.carry={k,p:p.i};closeOv();banner('Posez avec Action')}});
 }
-function openFurn(j,p){const P=S.plots[world.plot],f=P.furn[j],F=FURN[f.k];
-  const extra=F.use==='bed'?'<button class="btn" id="rest">Se reposer</button>':F.use==='stash'?'<button class="btn" id="st">Ouvrir le coffre</button>':'';
-  panel(`<h2>${F.n}</h2><div class="row">${extra}<button class="btn ghost" id="mv">Déplacer</button><button class="btn ghost" id="rm">Ranger (rend 50 %)</button><button class="btn ghost" id="cl">Fermer</button></div>`);
-  const r=$('#rest');if(r)r.onclick=()=>{G.players.forEach(q=>{q.hp=q.maxhp;q.st=q.maxst;cleanse(q)});closeOv();banner('Repos complet');sfx('heal',.5)};
-  const s=$('#st');if(s)s.onclick=()=>{closeOv();openBag('coffre')};
-  $('#mv').onclick=()=>{P.furn.splice(j,1);G.carry={k:f.k,p:p.i,free:true};world=keepPos(buildHouse(world.plot));closeOv()};
-  $('#rm').onclick=()=>{P.furn.splice(j,1);for(const k in F.cost)S.res[k]+=Math.floor(F.cost[k]/2);renderRes();save();netFurn(world.plot);world=keepPos(buildHouse(world.plot));closeOv()};
-}
 function keepPos(w){return w}
 function carryPos(p){const W=world;return{x:clamp(Math.round((p.x+p.fx*18)/8)*8,28,W.w-28),y:clamp(Math.round((p.y+p.fy*14)/8)*8,44,W.h-18)}}
-function placeCarry(p){if(world.id!=='house'){G.carry=null;return}const q=carryPos(G.players[G.carry.p]||p);S.plots[world.plot].furn.push({k:G.carry.k,x:q.x,y:q.y});G.carry=null;save();netFurn(world.plot);sfx('ok',.4);
-  const pos=G.players.map(o=>[o.x,o.y]);world=buildHouse(world.plot);world.bg=null;G.players.forEach((o,k)=>{o.x=pos[k][0];o.y=pos[k][1];if(blockedAt(world,o.x,o.y,5))o.y+=14})}
 /* ---------- sac et équipement ---------- */
 let bagSel=null,bagMode='sac';
 function openBag(mode='sac'){bagMode=mode;bagSel=null;menuOpen=true;$('#bag').hidden=false;renderBag();K={}}
@@ -1732,6 +1716,7 @@ function drawV12(L,c,t,ox,oy){
   for(const p of world.props){if(p.x<ox-50||p.x>ox+VW+50||p.y<oy-20||p.y>oy+VH+80)continue;
     if(p.type==='node'){const n=p.nd;L.push({y:n.y,f:()=>{if(!nodeReady(n)){if(n.type==='bois')spr(c,'n_stump',n.x,n.y+2);c.globalAlpha=.35;spr(c,n.spr,n.x,n.y+2,{sc:n.sc*.7});c.globalAlpha=1;return}
       spr(c,n.spr,n.x,n.y+2,{sc:n.sc});if(Math.sin(t*3+n.x)>.82){const a=t*4+n.y;px(c,'#ffffff',n.x+Math.cos(a)*7,n.y-12+Math.sin(a)*4,1,1);px(c,RES[n.type].c,n.x-4,n.y-16,2,2)}}})}
+    if(p.type==='furn'){const g=furnGeo(p.f);L.push({y:g.F.flat?-1e9:g.bot,f:()=>drawFurn(c,p.f)})}
     if(p.type==='fire')L.push({y:p.y,f:()=>{spr(c,'c_fire',p.x,p.y+8);for(let k=0;k<5;k++){const f=Math.sin(t*14+k*1.7);px(c,k%2?'#ffb040':'#ff6a2a',p.x-5+k*2,p.y-4-Math.abs(f)*5-(k===2?4:0),2,5+Math.abs(f)*3)}px(c,'#fff2a0',p.x-1,p.y-3,2,3);
       c.globalCompositeOperation='lighter';const g=c.createRadialGradient(p.x,p.y-4,0,p.x,p.y-4,40);g.addColorStop(0,'rgba(255,170,80,.3)');g.addColorStop(1,'rgba(255,170,80,0)');c.fillStyle=g;c.fillRect(p.x-40,p.y-44,80,80);c.globalCompositeOperation='source-over'}})}
   const npcs=world.npcs||[];
@@ -1772,7 +1757,7 @@ function openNpc(id){const N=NPCS[id],h=curHero();
     if(qAvail(h,q))return `<div class="qrow"><div class="t"><b>${q.n}</b><span>${q.d}</span><span class="pr">Récompense : ${rewTxt(q.rew)}</span></div><button class="btn sm" data-acc="${q.id}">Accepter</button></div>`;
     if(s&&s.s===2)return `<div class="qrow done"><div class="t"><b>${q.n}</b><span>Terminée</span></div></div>`;
     const why=(q.lv||1)>h.lv?'niveau '+q.lv+' requis':'plus tard…';return `<div class="qrow lock"><div class="t"><b>${q.n}</b><span>${why}</span></div></div>`}).join('');
-  panel(`<div class="npch"><canvas width="64" height="64" data-face="${N.look}"></canvas><div><h2>${N.n}</h2><p>« ${N.hi} »</p></div></div>${note}<div class="qlist">${rows||'<p class="note">Rien à vous demander pour l\'instant.</p>'}</div><button class="btn ghost" id="cl">Au revoir</button>`);
+  panel(`<div class="npch"><canvas width="64" height="64" data-face="${N.look}"></canvas><div><h2>${N.n}</h2><p>« ${N.lines?N.lines[Math.random()*N.lines.length|0]:N.hi} »</p></div></div>${note}<div class="qlist">${rows||(N.lines?'':'<p class="note">Rien à vous demander pour l\'instant.</p>')}</div><button class="btn ghost" id="cl">Au revoir</button>`);
   drawFaces();
   document.querySelectorAll('[data-acc]').forEach(b=>b.onclick=()=>{const q=QBYID[b.dataset.acc];h.q[q.id]={s:1,n:0};if(q.k==='visit'&&S.disc.includes(q.t)&&world.id===q.t)h.q[q.id].n=1;save();sfx('ok',.4);openNpc(id)});
   document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{const q=QBYID[b.dataset.done];const out=qReward(q);if(q.rep)delete h.q[q.id];else h.q[q.id].s=2;sfx('coin',.6);save();openNpc(id);$('#ovp').insertAdjacentHTML('afterbegin',`<p class="ok">Récompense : ${out}</p>`)});
@@ -1791,7 +1776,7 @@ function go(kind,arg){
   G.hz=[];G.ahz=[];G.bul=[];G.bolts=[];G.floats=[];G.parts=[];G.items=[];G.fx=[];G.zaps=[];G.zones=[];G.emit=[];G.amb=[];G.loot=[];G.carry=null;
   let sx,sy;
   if(kind==='field')kind='region',arg={id:'plaine',from:'capitale'};
-  if(kind==='town'){world=buildTown();world.id='capital';townNpcs(world);if(arg==='gate'){sx=360;sy=1010}else if(arg==='west'){sx=40;sy=950}else{sx=360;sy=868}
+  if(kind==='town'){world=buildTown();world.id='capital';townNpcs(world);townExtra(world);if(arg==='gate'){sx=360;sy=1010}else if(arg==='west'){sx=40;sy=950}else{sx=360;sy=868}
     G.players.forEach(p=>{p.hp=p.maxhp;p.down=false;p.st=p.maxst;cleanse(p)});banner(TIERS[S.bld.hall]+' de Cendre');music('town')}
   if(kind==='region'){const R=REG[arg.id],LY=RLAY[arg.id];world=buildRegion(arg.id);if(!S.disc.includes(arg.id)){S.disc.push(arg.id);save()}questEvent('visit',arg.id);
     const e=LY.exits.find(e=>e.to===arg.from),D=arg.at&&DUNGEONS[arg.at];
@@ -1831,6 +1816,7 @@ function interact(p){
   if(tr.kind==='bld')openBld(tr.k);
   if(tr.kind==='npc'){openNpc(tr.id);questEvent('talk',tr.id);return}
   if(tr.kind==='sign'){openSign();return}
+  if(tr.kind==='tsign'){panel(`<h2>Panneau</h2><p>← Domaine des aventuriers : terrains, maisons et écurie.</p><p class="note">Continuez vers l'ouest par la grande rue.</p><button class="btn ghost" id="cl">Fermer</button>`);return}
   if(tr.kind==='node'){if(nodeReady(tr.nd)&&!p.harv){p.harv={nd:tr.nd,t:0};sfx('hit',.2)}return}
   if(tr.kind==='chest'){tr.ch.open=true;const big=tr.ch.big,k=['or','bois','pierre','fer'][Math.random()*4|0],n=Math.round(rnd(12,22)*(world.tier||1)*(1+.25*S.bld.marche)*(big?2.5:1)*(k==='fer'?.5:1));
     if(world.kind==='dungeon'){G.run.loot[k]=(G.run.loot[k]||0)+n}else S.res[k]+=n;if(Math.random()<.3||big)S.res.cristal+=big?6:3;sfx('coin',.5);save();renderRes();float(tr.x,tr.y-24,'+'+n+' '+RES[k].n.toLowerCase(),RES[k].c);burst(tr.x,tr.y-8,'#dcae4c',big?30:14);
@@ -1843,7 +1829,7 @@ function interact(p){
 }
 function nearTrig(p){let best=null,bd=1e9;for(const t of world.trig){if(t.auto)continue;if(t.kind==='chest'&&t.ch.open)continue;if(t.kind==='node'&&!nodeReady(t.nd))continue;const d=dist(p.x,p.y,t.x,t.y);if(d<t.r&&d<bd){bd=d;best=t}}return best}
 function trigLabel(tr){if(tr.kind==='bld')return BLD[tr.k].n+' · niv. '+S.bld[tr.k];if(tr.kind==='chest')return tr.ch.big?'Grand coffre':'Coffre';
-  if(tr.kind==='npc')return'Parler : '+NPCS[tr.id].n;if(tr.kind==='sign')return'Lire le poteau';if(tr.kind==='node')return'Récolter : '+NODEDEF[tr.nd.type].n;
+  if(tr.kind==='npc')return'Parler : '+NPCS[tr.id].n;if(tr.kind==='sign')return'Lire le poteau';if(tr.kind==='tsign')return'Lire le panneau';if(tr.kind==='node')return'Récolter : '+NODEDEF[tr.nd.type].n;
   if(tr.kind==='plot'){const P=S.plots[tr.i];return P.owner<0?'Terrain à vendre':'Terrain de '+plotName(P)}
   if(tr.kind==='stable')return'Écurie';if(tr.kind==='bench')return'Établi : mobilier';if(tr.kind==='furn'){const f=S.plots[world.plot].furn[tr.j];return FURN[f.k].n}return''}
 function drawLighting(c,ox,oy,t){
@@ -1984,6 +1970,49 @@ function deleteHero(i){const n=S.heroes.length;
   S.heroes.splice(i,1);if(!S.heroes.length)S.heroes=[{name:'Héros',cls:'lame',look:'NinjaGreen',lv:1,xp:0,mount:null,ph:true}];
   if(S.cur>=S.heroes.length||S.cur===i)S.cur=0;else if(S.cur>i)S.cur--;save();if(NET.online)netFlush()}
 
+/* ===================== v13 : mobilier solide et orientable, maisons de la cité, route du domaine ===================== */
+const SOLF={f_bed_y:.86,f_bed_r:.86,f_bed_b:.86,f_bed_g:.86,f_table:.85,f_sofa:.7,f_chest:.7,f_jar:.7,f_plant:.5,ic_Cup:.6};
+function furnGeo(f){const F=FURN[f.k],r=AT[F.spr]||[0,0,16,16],w0=r[2],h0=r[3],rot=(f.r||0)%4,sw=rot%2?h0:w0,sh=rot%2?w0:h0;
+  const cy=f.y+2-h0/2;return{F,w0,h0,rot,cx:f.x,cy,x0:f.x-sw/2,y0:cy-sh/2,sw,sh,bot:cy+sh/2}}
+function buildHouse(i){const P=S.plots[i],H=HOUSE[P.lvl];
+  const w={kind:'town',id:'house',plot:i,name:H.n+' de '+plotName(P),w:H.w,h:H.h,bgFn:houseBg(H),bg:null,solids:[{x:0,y:0,w:H.w,h:26},{x:0,y:0,w:16,h:H.h},{x:H.w-16,y:0,w:16,h:H.h},{x:0,y:H.h-10,w:H.w/2-16,h:10},{x:H.w/2+16,y:H.h-10,w:H.w/2,h:10}],trig:[],enemies:[],boss:null,props:[],folk:[]};
+  w.props.push({type:'spr',n:'f_bench',x:46,y:56});w.solids.push({x:22,y:40,w:48,h:16});w.trig.push({kind:'bench',x:46,y:66,r:16});
+  P.furn.forEach((f,j)=>{const g=furnGeo(f);w.props.push({type:'furn',f,fi:j});
+    if(!g.F.flat){const fr=SOLF[g.F.spr]||.5,hh=Math.max(6,g.sh*fr);w.solids.push({x:g.x0+2,y:g.bot-hh,w:g.sw-4,h:hh-1})}
+    w.trig.push({kind:'furn',j,x:g.cx,y:g.bot+6,r:Math.max(14,g.sw/2+4)})});
+  w.trig.push({kind:'exit',to:'estates',x:H.w/2,y:H.h-2,r:14,auto:true,plot:i});
+  return w}
+function drawFurn(c,f,alpha=1){const g=furnGeo(f);c.globalAlpha=alpha;frame(c,g.F.spr,0,0,0,0,g.cx,g.cy,{ay:.5,rot:g.rot*Math.PI/2});c.globalAlpha=1;return g}
+function carryFurn(p){const q=carryPos(p);return{k:G.carry.k,x:q.x,y:q.y,r:G.carry.rot||0}}
+function placeCarry(p){if(world.id!=='house'){G.carry=null;return}const f=carryFurn(G.players[0]||p);S.plots[world.plot].furn.push(f);G.carry=null;save();netFurn(world.plot);sfx('ok',.4);
+  const pos=G.players.map(o=>[o.x,o.y]);world=buildHouse(world.plot);world.bg=null;G.players.forEach((o,k)=>{o.x=pos[k][0];o.y=pos[k][1];for(let n=0;n<8&&blockedAt(world,o.x,o.y,5);n++)o.y+=8})}
+function openFurn(j,p){const P=S.plots[world.plot],f=P.furn[j],F=FURN[f.k];
+  const extra=F.use==='bed'?'<button class="btn" id="rest">Se reposer</button>':F.use==='stash'?'<button class="btn" id="st">Ouvrir le coffre</button>':'';
+  panel(`<h2>${F.n}</h2><div class="row">${extra}<button class="btn ghost" id="rot">Tourner</button><button class="btn ghost" id="mv">Déplacer</button><button class="btn ghost" id="rm">Ranger (rend 50 %)</button><button class="btn ghost" id="cl">Fermer</button></div>`);
+  const r=$('#rest');if(r)r.onclick=()=>{G.players.forEach(q=>{q.hp=q.maxhp;q.st=q.maxst;cleanse(q)});closeOv();banner('Repos complet');sfx('heal',.5)};
+  const s=$('#st');if(s)s.onclick=()=>{closeOv();openBag('coffre')};
+  $('#rot').onclick=()=>{f.r=((f.r||0)+1)%4;save();netFurn(world.plot);const pos=G.players.map(o=>[o.x,o.y]);world=buildHouse(world.plot);G.players.forEach((o,k)=>{o.x=pos[k][0];o.y=pos[k][1];for(let n=0;n<8&&blockedAt(world,o.x,o.y,5);n++)o.y+=8});sfx('roll',.2)};
+  $('#mv').onclick=()=>{P.furn.splice(j,1);G.carry={k:f.k,p:p.i,free:true,rot:f.r||0};world=keepPos(buildHouse(world.plot));closeOv();banner('Action : poser · Roulade : tourner')};
+  $('#rm').onclick=()=>{P.furn.splice(j,1);for(const k in F.cost)S.res[k]+=Math.floor(F.cost[k]/2);renderRes();save();netFurn(world.plot);world=keepPos(buildHouse(world.plot));closeOv()};
+}
+/* ---------- cité : maisons habitées et route du domaine ---------- */
+const THOUSES=[['h_orange',205,405,'v1'],['h_red',515,405,'v2'],['h_green',195,800,'v3'],['h_beige',525,800,'v4'],['h_orange2',110,262,'v5'],['h_wood2',610,262,'v6']];
+Object.assign(NPCS,{
+ v1:{n:'Jeanne la tisserande',look:'Villager',zone:'capital',lines:['Mes tapis se vendent jusqu\'au désert d\'Ambre !','Le métier à tisser grince depuis que la couronne a brûlé.','Passez au domaine des aventuriers, mes tapis y feront merveille.']},
+ v2:{n:'Bastien le boulanger',look:'Villager2',zone:'capital',lines:['Du pain chaud pour les braves !','Les gelées ont encore mangé ma farine…','On dit que le Cyclope garde un trésor dans la carrière.']},
+ v3:{n:'Petit Lou',look:'Boy',zone:'capital',lines:['Quand je serai grand, je serai Gardien !','Tu as déjà vu un dragon, toi ?','Ma maman dit qu\'il ne faut pas aller seul dans la forêt.']},
+ v4:{n:'Agathe la fleuriste',look:'Villager4',zone:'capital',lines:['Les fleurs des Ronces sont les plus belles du royaume.','Mère Ondine m\'achète toutes mes herbes.','Le printemps revient toujours, même après les cendres.']},
+ v5:{n:'Vieux Mathurin',look:'OldMan2',zone:'capital',lines:['De mon temps, la cité n\'était qu\'un campement.','Chaque pierre posée rend la ville plus forte.','Les esprits de la crypte ne dorment jamais vraiment.']},
+ v6:{n:'Rose la garde-forestière',look:'Villager5',zone:'capital',lines:['La Forêt d\'Émeraude cache des champignons qui marchent…','Récoltez les souches, pas les jeunes arbres !','Le domaine des aventuriers est à l\'ouest, par la grande rue du bas.']}});
+for(const k in NPCS)if(!AT['ch_'+NPCS[k].look])NPCS[k].look='OldMan';
+function townExtra(w){
+  for(const [n,x,y,v] of THOUSES){const r=AT[n];if(!r)continue;w.props.push({type:'spr',n,x,y});w.solids.push({x:x-r[2]/2+3,y:y-r[3]*.55,w:r[2]-6,h:r[3]*.55-2});
+    const N=NPCS[v];N.x=x+22;N.y=y+16;w.npcs.push({id:v,x:N.x,y:N.y});w.trig.push({kind:'npc',id:v,x:N.x,y:N.y+8,r:20})}
+  w.solids=w.solids.filter(s=>!(s.x<70&&s.y>920&&s.y<970&&s.h<12));
+  w.props=w.props.filter(p=>!(p.type==='spr'&&p.x<70&&Math.abs(p.y-950)<30));
+  w.trig.push({kind:'exit',to:'estates',x:4,y:950,r:22,auto:true});
+  w.props.push({type:'spr',n:'n_sign',x:46,y:928});w.trig.push({kind:'tsign',x:46,y:938,r:16})}
+
 migrate12(S);
 /* ===== Interface ===== */
 function renderRes(){
@@ -2017,7 +2046,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='12.5';
+const VERSION='13.0';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
