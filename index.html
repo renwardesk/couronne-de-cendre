@@ -195,6 +195,7 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
 .tfinfo{max-height:34vh;overflow:auto;padding:0 12px 10px}
 #bPot{line-height:1.05}#bPot b{font-size:12px}
 .ieq{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;text-align:left}.ieq div{display:flex;flex-direction:column;border-bottom:1px solid var(--line);padding:2px 0}.ieq small{color:var(--muted);font-size:11px}
+.unl{display:flex;flex-direction:column;gap:3px;text-align:left;margin:8px 0;font-size:13px}.unl div{opacity:.55}.unl .got{opacity:1;color:#7fe07a}.unl .next{opacity:1;color:#ffd34a}
 
 </style>
 </head>
@@ -1051,7 +1052,7 @@ function triggers(){
   for(const t of world.trig){if(!t.auto||dist(p.x,p.y,t.x,t.y)>t.r)continue;
     if(t.kind==='exit'){if(t.to==='estates'&&t.plot!=null){go('estates',{plot:t.plot});return}travel(t.to,world.id);return}
     if(t.kind==='house'){go('house',{plot:t.i});return}
-    if(t.kind==='dungeon'){const D=DUNGEONS[t.id];if(dunLocked(D)){if(G.msgT<=0){float(p.x,p.y-28,'Hôtel de ville niv. '+D.need+' requis','#ff9a70');G.msgT=1.2}}else{go('dungeon',{id:t.id,idx:0});return}}
+    if(t.kind==='dungeon'){const D=DUNGEONS[t.id];if(dunLocked(D)){if(G.msgT<=0){float(p.x,p.y-28,dunWhy(D),'#ff9a70');G.msgT=1.2}}else{go('dungeon',{id:t.id,idx:0});return}}
     if(t.kind==='door'){go('dungeon',{id:world.id,idx:world.room+1});return}}
 }
 function finish(){
@@ -2311,7 +2312,7 @@ const BUFF={eforce:'Rage',epierre:'Pierre',aiguis:'Aiguisé',torche:'Fagot'};
 function buffOn(k){return (S.buffs||{})[k]>Date.now()}
 function openCraft(){const ct=o=>Object.entries(o).map(([r,v])=>`<span class="${S.res[r]<v?'no':''}">${v} ${RES[r].n.toLowerCase()}</span>`).join(', ');
   panel(`<h2>Artisanat</h2><p class="note">Les ressources ramassées dehors servent ici et pour améliorer l'équipement : armes avec fer + bois, armures avec fer + pierre, bottes avec pierre + bois, bijoux avec cristal + herbes.</p><div class="qlist">${CRAFT.map(r=>`<div class="qrow"><div class="t"><b>${r.n}${r.k==='potion'?' · '+(S.pot||0)+'/5':buffOn(r.k)?' · actif '+Math.ceil((S.buffs[r.k]-Date.now())/60000)+' min':''}</b><span>${r.d}</span><span class="pr">${ct(r.c)}</span></div><button class="btn sm" data-c="${r.k}" ${canPay(r.c)&&!(r.k==='potion'&&(S.pot||0)>=5)?'':'disabled'}>${r.k==='potion'?'Préparer':'Utiliser'}</button></div>`).join('')}</div><button class="btn ghost" id="cl">Fermer</button>`);
-  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const r=CRAFT.find(x=>x.k===b.dataset.c);if(!pay(r.c))return;if(r.k==='potion')S.pot=(S.pot||0)+1;else{S.buffs=S.buffs||{};S.buffs[r.k]=Math.max(Date.now(),S.buffs[r.k]||0)+300000;refreshStats()}sfx('magic',.4);save();renderRes();potBtn();openCraft()})}
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const r=CRAFT.find(x=>x.k===b.dataset.c);if(!pay(r.c))return;if(r.k==='potion')S.pot=(S.pot||0)+1;else{S.buffs=S.buffs||{};S.buffs[r.k]=Math.max(Date.now(),S.buffs[r.k]||0)+(typeof bl==='function'&&bl('sanct')>=4?600000:300000);refreshStats()}sfx('magic',.4);save();renderRes();potBtn();openCraft()})}
 const SELL={bois:1,pierre:1,herbe:2,fer:4,cristal:8};
 function openTrade(){const m=1+.25*S.bld.marche;
   panel(`<h2>Échoppe de Hakim</h2><p class="note">Je rachète vos ressources en trop (marché niveau ${S.bld.marche} : +${25*S.bld.marche} %).</p><div class="qlist">${Object.entries(SELL).map(([k,v])=>`<div class="qrow"><div class="t"><b>${RES[k].n} · ${S.res[k]}</b><span>${Math.round(v*m*10)/10} or l'unité</span></div><button class="btn sm" data-s="${k}" data-n="10" ${S.res[k]>=10?'':'disabled'}>Vendre 10</button><button class="btn ghost sm" data-s="${k}" data-n="all" ${S.res[k]>0?'':'disabled'}>Tout</button></div>`).join('')}</div><button class="btn ghost" id="cl">Fermer</button>`);
@@ -2404,6 +2405,85 @@ function wpnOf(h){const i=S.heroes.indexOf(h);if(i<0)return h.wpn||null;const it
 {const _kr=killReward;killReward=function(e){_kr(e);if(e.elite&&(world.tier||1)>=2&&Math.random()<.04*(world.tier||1)){S.res.sceau++;renderRes();float(e.x,e.y-34,'+1 sceau royal','#ff7a6a');sfx('coin',.5);save()}}}
 BLD.hall.d='Fait grandir la cité et plafonne le niveau des autres bâtiments. Tous les donjons sont ouverts dès le départ.';
 
+/* ================= v16 : clés de donjon, niveaux minimum, enjeux de la ville, outils admin ================= */
+const DUNLV={golem:2,liche:4,wyrm:6,frog:7,samurai:9,squid:11};
+const KEYHALL={golem:1,liche:2,wyrm:2,frog:3,samurai:4,squid:5};
+const KEYCOST={golem:{or:80,fer:6,pierre:10},liche:{or:120,fer:8,cristal:4},wyrm:{or:160,fer:10,bois:20,cristal:6},frog:{or:200,herbe:20,cristal:8},samurai:{or:300,fer:20,cristal:12},squid:{or:400,fer:25,cristal:20}};
+function keyName(id){return 'Clé : '+DUNGEONS[id].n}
+function hasKey(id,h){h=h||curHero();return isAdmin()||!!(h.keys||{})[id]}
+function giveKey(id,why){const h=curHero();h.keys=h.keys||{};if(h.keys[id])return false;h.keys[id]=1;save();const p=G.players[0];if(p)float(p.x,p.y-40,keyName(id)+' obtenue','#ffd34a');banner(keyName(id)+(why?' · '+why:''));sfx('ok',.6);return true}
+function dunWhy(D){const id=D.boss,h=curHero();if(isAdmin())return'';if((h.lv||1)<DUNLV[id])return'Niveau '+DUNLV[id]+' requis';if(!hasKey(id))return keyName(id)+' requise (quête, élites, forge)';return''}
+dunLocked=function(D){return !!dunWhy(D)};
+/* anciennes sauvegardes : les boss déjà vaincus donnent leur clé */
+function keyMig(s){for(const h of s.heroes||[]){h.keys=h.keys||{};for(const id in DUNLV)if((s.wins||{})[id]>0)h.keys[id]=1}}
+{const _m=migrate12;migrate12=function(s){const r=_m(s);keyMig(r||s);return r}}
+keyMig(S);
+/* quête : accepter une quête de boss donne la clé */
+let keyTick=0;
+function keyFromQuests(){const h=curHero();if(!h)return;for(const q of QUESTS){if(q.k!=='boss'||!DUNLV[q.t])continue;const s=qState(h,q.id);if(s&&s.s===1&&!(h.keys||{})[q.t])giveKey(q.t,'reçue pour la quête « '+q.n+' »')}}
+{const _u=updV12;updV12=function(dt){_u(dt);if((keyTick-=dt)<=0){keyTick=1;try{keyFromQuests()}catch(e){}}}}
+/* butin : les monstres d'une région peuvent lâcher la clé de ses donjons */
+{const _kr=killReward;killReward=function(e){_kr(e);if(world.kind!=='region')return;const L=RLAY[world.id];if(!L)return;const ids=Object.keys(L.dun).filter(id=>!(curHero().keys||{})[id]);if(!ids.length)return;
+  if(Math.random()<(e.elite?.06:.006))giveKey(ids[Math.random()*ids.length|0],'trouvée sur un monstre')}}
+
+/* ---------- ce que débloque chaque bâtiment ---------- */
+const UNLOCK={
+ hall:{1:'Clé de la Carrière à la forge',2:'Bibliothèque du château (Élise et ses quêtes) · clés de la Crypte et du Tengu',3:'Clé de la Mare maudite',4:'Clé du Temple des sables',5:'Clé de la Grotte de cristal'},
+ forge:{1:'Reforger un bonus · améliorations jusqu\'à +2',2:'Améliorations jusqu\'à +4',3:'Enchantement des objets · jusqu\'à +6',4:'Jusqu\'à +8',5:'Jusqu\'à +10'},
+ sanct:{1:'Potions de soin',2:'Élixirs (rage, pierre, aiguisé, fagot)',3:'Potions : 7 au maximum',4:'Élixirs de 10 minutes',5:'Potions : 10 au maximum'},
+ caserne:{1:'Maître Kenji et ses quêtes',2:'Réinitialisations à moitié prix',3:'+1 point de talent pour chaque héros',4:'Roulade plus rapide à recharger',5:'+1 point de talent supplémentaire'},
+ marche:{1:'Échoppe : vendre ses ressources',2:'Recyclage +25 % d\'or',3:'Marchand d\'objets rares',4:'Recyclage +50 % d\'or',5:'Objets rares de meilleure qualité'}};
+function bl(k){return isAdmin()?5:(S.bld[k]||0)}
+{const _ob=openBld;openBld=function(k){_ob(k);const U=UNLOCK[k];if(!U)return;const l=S.bld[k],P=$('#ovp'),row=P.querySelector('.row');
+  const html=`<div class="unl">${Object.entries(U).map(([n,t])=>`<div class="${+n<=l?'got':+n===l+1?'next':''}"><b>Niv. ${n}</b> ${t}</div>`).join('')}</div>`;
+  if(row)row.insertAdjacentHTML('beforebegin',html);else P.insertAdjacentHTML('beforeend',html);
+  if(isAdmin()&&NET.online){const a=document.createElement('div');a.className='row';a.innerHTML=`<span class="note">Admin :</span>${[0,1,2,3,4,5].map(n=>`<button class="btn ghost sm" data-al="${n}">${n}</button>`).join('')}`;P.appendChild(a);
+    a.querySelectorAll('[data-al]').forEach(b=>b.onclick=async()=>{const r=await netRpc('cendre_admin_setbld',{b:k,l:+b.dataset.al});if(r&&r.bld){S.bld=r.bld;save();refreshStats();openBld(k)}})}}}
+/* sanctuaire : potions et élixirs */
+function potMax(){const s=bl('sanct');return s>=5?10:s>=3?7:5}
+{const _oc=openCraft;openCraft=function(){_oc();const s=bl('sanct'),P=$('#ovp');
+  P.querySelectorAll('[data-c]').forEach(b=>{const k=b.dataset.c,need=k==='potion'?1:2;if(s<need){b.disabled=true;b.textContent='Sanctuaire niv. '+need}
+    if(k==='potion'&&(S.pot||0)<potMax()&&s>=1){const r=CRAFT[0];b.disabled=!canPay(r.c)}});
+  P.querySelectorAll('.qrow b').forEach(b=>b.innerHTML=b.innerHTML.replace(/ · (\d+)\/5/,' · $1/'+potMax()));
+  /* clés de donjon */
+  const h=curHero(),hall=bl('hall'),ct=o=>Object.entries(o).map(([r,v])=>`<span class="${S.res[r]<v?'no':''}">${v} ${RES[r].n.toLowerCase()}</span>`).join(', ');
+  const box=document.createElement('div');box.innerHTML=`<span class="lbl">Clés de donjon (forge)</span><div class="qlist">${Object.keys(DUNLV).map(id=>{const D=DUNGEONS[id],own=(h.keys||{})[id],okH=hall>=KEYHALL[id],okF=bl('forge')>=1;
+    return `<div class="qrow"><div class="t"><b>${keyName(id)}${own?' ✓':''}</b><span>${D.n} · niveau ${DUNLV[id]} minimum${!okH?' · hôtel de ville niv. '+KEYHALL[id]:''}${!okF?' · forge niv. 1':''}</span><span class="pr">${ct(KEYCOST[id])}</span></div><button class="btn sm" data-key="${id}" ${!own&&okH&&okF&&canPay(KEYCOST[id])?'':'disabled'}>${own?'Possédée':'Forger'}</button></div>`}).join('')}</div>`;
+  P.insertBefore(box,$('#cl'));
+  box.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>{const id=b.dataset.key;if(!pay(KEYCOST[id]))return;giveKey(id,'forgée');renderRes();openCraft()})}}
+/* le dojo : points de talent et recharge de roulade */
+{const _tp=tpTotal;tpTotal=function(h){return _tp(h)+((S.bld.caserne||0)>=3?1:0)+((S.bld.caserne||0)>=5?1:0)}}
+{const _rc=resetCost;resetCost=function(h){return Math.round(_rc(h)*((S.bld.caserne||0)>=2?.5:1))}}
+{const _u=updV12;updV12=function(dt){_u(dt);if((S.bld.caserne||0)>=4)for(const p of G.players)if(p.rollCd>0)p.rollCd-=dt*.35}}
+/* marché : recyclage et objets rares */
+{const _rg=recycleGain;recycleGain=function(it){const o=_rg(it),m=S.bld.marche>=4?1.5:S.bld.marche>=2?1.25:1;o.or=Math.round(o.or*m);return o}}
+{const _ot=openTrade;openTrade=function(){if(bl('marche')<1){panel(`<h2>Échoppe</h2><p>Le marché doit être construit (niveau 1) pour vendre vos ressources.</p><button class="btn ghost" id="cl">Fermer</button>`);return}_ot();
+  if(bl('marche')>=3){const P=$('#ovp'),h=curHero(),t=Math.max(1,Math.min(5,Math.ceil(h.lv/3))),pr=150*t,d=document.createElement('div');
+    d.innerHTML=`<span class="lbl">Objets rares</span><div class="qrow"><div class="t"><b>Objet rare ou mieux (palier ${t})</b><span>Un objet au hasard pour votre classe.</span><span class="pr">${pr} or</span></div><button class="btn sm" id="buyR" ${S.res.or>=pr&&sacN()<SACMAX?'':'disabled'}>Acheter</button></div>`;
+    P.insertBefore(d,$('#cl'));$('#buyR').onclick=()=>{if(!pay({or:pr}))return;const it=genItem(t,bl('marche')>=5?1.5:.8,1);S.items.push(it);save();renderRes();sfx('coin',.6);banner('Acheté : '+it.n);openTrade()}}}}
+/* forge : enchantement */
+const ENCH=[['atk','Ardeur',3],['crit','Précision',1.5],['ls','Vampirisme',.8],['hp','Vigueur',12],['def','Rempart',1.2],['spd','Célérité',1.5],['sk','Arcanes',3]];
+{const _is=itStats;itStats=function(it){const o=_is(it);if(it.ench){const [k,v]=it.ench;o[k]=Math.round(((o[k]||0)+v)*10)/10}return o}}
+function enchCost(it){return{or:60*it.tier,cristal:3*it.tier,herbe:5}}
+{const _rb=renderBag;renderBag=function(){_rb();const sel=S.items.find(x=>x.uid===bagSel),Ac=document.querySelector('#acts');if(!sel||!Ac)return;
+  if(sel.ench){const E=ENCH.find(e=>e[0]===sel.ench[0]);Ac.insertAdjacentHTML('beforebegin',`<div class="skl" style="color:#c9a0ff">Enchantement ${E?E[1]:''} : ${fmtStat(sel.ench[0],sel.ench[1])}</div>`)}
+  const ok=bl('forge')>=3,c=enchCost(sel),ct=Object.entries(c).map(([r,v])=>v+' '+RES[r].n.toLowerCase()).join(', ');
+  const b=document.createElement('button');b.className='btn ghost sm';b.innerHTML=`${sel.ench?'Réenchanter':'Enchanter'} <small>(${ct}${ok?'':' · forge niv. 3'})</small>`;b.disabled=!ok||!canPay(c);
+  b.onclick=()=>{if(!pay(c))return;const E=ENCH[Math.random()*ENCH.length|0],v=Math.round(E[2]*(1+.4*(sel.tier-1))*(1+.2*sel.rar)*10)/10;sel.ench=[E[0],v];sfx('magic',.5);banner('Enchantement '+E[1]);save();refreshStats();renderBag()};Ac.appendChild(b)}}
+/* château : la bibliothèque s'ouvre au niveau 2 */
+{const _in=interact;interact=function(p){const tr=nearTrig(p);if(tr&&tr.kind==='stair'&&world.inb==='hall'&&tr.to===1&&bl('hall')<2){float(p.x,p.y-28,'Bibliothèque : hôtel de ville niv. 2','#ff9a70');return}return _in(p)}}
+/* dojo : Kenji n'enseigne qu'une fois le dojo construit (le bâtiment n'a pas d'intérieur avant) ; Tom arrive avec la forge niv. 2 */
+{const _bi=buildInterior;buildInterior=function(b,fl){const w=_bi(b,fl);if(b==='forge'&&bl('forge')<2){w.npcs=w.npcs.filter(n=>n.id!=='apprenti');w.trig=w.trig.filter(t=>!(t.kind==='npc'&&t.id==='apprenti'))}return w}}
+/* ---------- outils admin (Ren) ---------- */
+{const _rh=renderHeroes;renderHeroes=function(){_rh();if(!isAdmin()||heroTab!=='perso')return;const A=document.querySelector('.admin');if(!A)return;const d=document.createElement('div');d.className='row';
+  d.innerHTML=`<button class="btn ghost sm" id="adKeys">Toutes les clés</button><button class="btn ghost sm" id="adLv5">+5 niveaux</button><button class="btn ghost sm" id="adSc">+30 sceaux</button><button class="btn ghost sm" id="adBld">Ville au max</button><button class="btn ghost sm" id="adQ">Histoire : chapitre suivant</button>`;A.appendChild(d);
+  const h=curHero();
+  $('#adKeys').onclick=()=>{h.keys=h.keys||{};for(const id in DUNLV)h.keys[id]=1;save();banner('Toutes les clés')};
+  $('#adLv5').onclick=()=>{for(let k=0;k<5;k++){h.xp=XPN(h.lv);gainXP(0)}refreshStats();renderHeroes()};
+  $('#adSc').onclick=()=>{S.res.sceau+=30;renderRes();save()};
+  $('#adBld').onclick=async()=>{if(!NET.online){for(const k in BLD)S.bld[k]=5;save();refreshStats();banner('Ville au max (hors ligne)');return}for(const k of Object.keys(BLD)){const r=await netRpc('cendre_admin_setbld',{b:k,l:5});if(r&&r.bld)S.bld=r.bld}save();refreshStats();banner('Ville au maximum')};
+  $('#adQ').onclick=()=>{const q=QUESTS.find(q=>q.m&&!(qState(h,q.id)&&qState(h,q.id).s===2));if(!q)return banner('Histoire terminée');h.q[q.id]={s:2,n:q.c};if(q.k==='boss')giveKey(q.t);save();renderHeroes();banner('Chapitre validé : '+q.n)}}}
+
 migrate12(S);
 /* ===== Interface ===== */
 function renderRes(){
@@ -2437,7 +2517,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='15.1';
+const VERSION='16.0';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
