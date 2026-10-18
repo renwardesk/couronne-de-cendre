@@ -883,7 +883,7 @@ function render(t){
   if(!world.bg&&ready(IMG.atlas))world.bg=world.bgFn();
   const ox=Math.round(cam.x+(G.shake>0?rnd(-2,2):0)),oy=Math.round(cam.y+(G.shake>0?rnd(-2,2):0));
   c.save();c.translate(-ox,-oy);
-  if(world.bg)c.drawImage(world.bg,0,0);
+  if(world.ter)drawTer(c,ox,oy);else if(world.bg)c.drawImage(world.bg,0,0);
   if(world.kind==='dungeon'){
     for(const p of world.props)if(p.type==='wall')spr(c,p.n,p.x,p.y-4);
     for(const tx of world.torches||[]){const f=Math.sin(t*12+tx)*1.2;px(c,'#3a332a',tx-1,22,3,10);px(c,'#d65a3c',tx-2,15+f,5,7);px(c,'#f2c25a',tx-1,17+f,3,4)}
@@ -2836,6 +2836,326 @@ function sigAttack(b,tgt,kind){
   return _in(p)}}
 {const _tl=trigLabel;trigLabel=function(tr){if(tr.kind==='dungeon'){const D=DUNGEONS[tr.id];return(dunLocked(D)?'🔒 ':'Entrer : ')+D.n}return _tl(tr)}}
 
+/* ===================== v20 : moteur de relief des grandes régions (étages, falaises, rampes, structures) ===================== */
+IMG.relief=new Image();IMG.relief.src='relief.png';IMG.relief.addEventListener('load',()=>{for(const k in TERC)TERC[k].cache.clear()});
+const RSTY={snow:0,sand:1,grass:2,forest:3,stone:4,bark:5,sandstone:6,ice:7,hedge:8},RXB=45;
+const TK={G:0,WATER:1,ICE:2,HEDGE:3,WALL:4,FLOOR:5,PLANK:6,VOID:7,BRIDGE:8,PATH:9,RAMP:10};
+const CH=2,CW=256,TERC={};
+function mulb(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hsh(x,y,s){let h=(x*374761393+y*668265263+(s|0)*1442695041)|0;h=Math.imul(h^h>>>13,1274126177);return((h^h>>>16)>>>0)/4294967296}
+/* ---------- construction de la grille ---------- */
+function Ter(id,tw,th,o){const n=tw*th;return Object.assign({pave:o.pave,moss:o.moss,id,tw,th,n,h:new Int8Array(n),k:new Uint8Array(n),s:new Uint8Array(n).fill(RSTY[o.sty]),ws:new Uint8Array(n),ramps:[],R:mulb(o.seed||7),cache:new Map(),labels:[],zones:{},
+  sty:o.sty,ground:o.ground,road:o.road,lake:o.lake||6,shade:o.shade||null,deco:o.deco||[],decoN:o.decoN||.12,floor:o.floor||'road9',mini:o.mini,hedge:o.hedge||0},o.extra||{})}
+const tI=(T,x,y)=>y*T.tw+x,tIn=(T,x,y)=>x>=0&&y>=0&&x<T.tw&&y<T.th;
+function tShape(T,cx,cy,rx,ry,fn,rough=.22,sd=0){const x0=Math.max(0,Math.floor(cx-rx*1.5)),x1=Math.min(T.tw-1,Math.ceil(cx+rx*1.5)),y0=Math.max(0,Math.floor(cy-ry*1.5)),y1=Math.min(T.th-1,Math.ceil(cy+ry*1.5));
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const a=Math.atan2(y-cy,x-cx),k=1+rough*(Math.sin(a*3+sd)*.55+Math.sin(a*5+sd*2.3)*.3+Math.sin(a*9+sd*1.7)*.15);
+    if(((x-cx)/(rx*k))**2+((y-cy)/(ry*k))**2<1)fn(tI(T,x,y),x,y)}}
+function tRaise(T,cx,cy,rx,ry,L,o={}){tShape(T,cx,cy,rx,ry,i=>{if(T.h[i]<L){T.h[i]=L;if(o.sty!=null)T.s[i]=RSTY[o.sty]}if(o.k!=null)T.k[i]=o.k},o.rough??.22,o.sd||cx)}
+function tLower(T,cx,cy,rx,ry,L,o={}){tShape(T,cx,cy,rx,ry,i=>{if(T.h[i]>L)T.h[i]=L;if(o.k!=null)T.k[i]=o.k;if(o.sty!=null)T.s[i]=RSTY[o.sty]},o.rough??.22,o.sd||cy)}
+function tKind(T,cx,cy,rx,ry,k,o={}){tShape(T,cx,cy,rx,ry,i=>{T.k[i]=k},o.rough??.2,o.sd||cx+cy)}
+function tNorth(T,L,yf,o={}){for(let x=0;x<T.tw;x++){const e=Math.round(yf(x));for(let y=0;y<Math.min(T.th,e);y++){const i=tI(T,x,y);if(T.h[i]<L){T.h[i]=L;if(o.sty!=null)T.s[i]=RSTY[o.sty]}}}}
+function tRect(T,x0,y0,w,h,fn){for(let y=Math.max(0,y0);y<Math.min(T.th,y0+h);y++)for(let x=Math.max(0,x0);x<Math.min(T.tw,x0+w);x++)fn(tI(T,x,y),x,y)}
+function tFlat(T,cx,cy,r,L){const lv=L??T.h[tI(T,cx,cy)];tRect(T,cx-r,cy-r,2*r+1,2*r+1,(i,x,y)=>{if((x-cx)**2+((y-cy)*1.3)**2<=r*r){T.h[i]=lv;if(T.k[i]!==TK.PATH)T.k[i]=TK.G}})}
+/* nettoyage : une falaise complète sous chaque bord, pas de colonnes d'une tuile, pas de chute de plus d'un étage */
+function tClean(T){const {tw,th,h,k}=T;
+  for(let it=0;it<14;it++){let ch=0;
+    for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const i=y*tw+x,v=h[i];if(k[i]===TK.VOID||k[i]===TK.BRIDGE)continue;
+      if(y+1<th&&h[i+tw]<v&&k[i+tw]!==TK.VOID&&k[i+tw]!==TK.BRIDGE){
+        for(let q=2;q<=CH+1;q++){if(y+q>=th)break;if(h[i+q*tw]>=v){for(let j=1;j<q;j++)h[i+j*tw]=v;ch=1;break}}
+        if(v-h[i+tw]>1){h[i]=h[i+tw]+1;ch=1}}
+      if(x>0&&x<tw-1&&h[i-1]<v&&h[i+1]<v&&k[i-1]!==TK.VOID&&k[i+1]!==TK.VOID){h[i]=Math.max(h[i-1],h[i+1]);ch=1}
+      if(y>0&&y<th-1&&h[i-tw]<v&&h[i+tw]<v&&k[i-tw]!==TK.VOID){h[i]=Math.max(h[i-tw],h[i+tw]);ch=1}}
+    if(!ch)break}}
+/* rampe (ou échelle) taillée dans la falaise sous le bord d'un plateau */
+function tRamp(T,x,y,w=3,type='ramp'){const {tw,th,h}=T;
+  for(let d=0;d<30;d++)for(const sg of d?[1,-1]:[1]){const xx=x+d*sg;if(xx<1||xx+w>=tw-1)continue;
+    const L=h[tI(T,xx,y)];let yy=y;while(yy<th-CH-2&&h[tI(T,xx,yy+1)]>=L)yy++;if(yy>=th-CH-2)continue;let ok=true;
+    for(let dx=0;dx<w&&ok;dx++){if(h[tI(T,xx+dx,yy)]!==L)ok=false;for(let q=1;q<=CH&&ok;q++){const j=tI(T,xx+dx,yy+q);if(h[j]!==L-1||T.k[j]===TK.WATER||T.k[j]===TK.VOID)ok=false}
+      const b=tI(T,xx+dx,yy+CH+1);if(h[b]>L-1||T.k[b]===TK.WATER)ok=false}
+    if(!ok)continue;for(let dx=0;dx<w;dx++){for(let q=1;q<=CH;q++)T.k[tI(T,xx+dx,yy+q)]=TK.RAMP;const b=tI(T,xx+dx,yy+CH+1);if(T.k[b]!==TK.PATH)T.k[b]=TK.G}
+    const r={x:xx,y:yy+1,w,L,type,sty:T.s[tI(T,xx,yy)]};T.ramps.push(r);return r}
+  return null}
+/* chemins : polylignes en cases, largeur 3, sans couper falaises, eau, murs */
+function tPath(T,pts,wd=3){for(let s=0;s<pts.length-1;s++){const [ax,ay]=pts[s],[bx,by]=pts[s+1],n=Math.ceil(Math.hypot(bx-ax,by-ay)*2);
+  for(let j=0;j<=n;j++){const px_=ax+(bx-ax)*j/n,py_=ay+(by-ay)*j/n;for(let dy=-1;dy<wd-1;dy++)for(let dx=-1;dx<wd-1;dx++){const x=Math.round(px_+dx),y=Math.round(py_+dy);if(!tIn(T,x,y))continue;const i=tI(T,x,y);if(T.k[i]===TK.G)T.k[i]=TK.PATH}}}}
+/* labyrinthe de haies : grille de couloirs (3) et murs (2) */
+function tMaze(T,x0,y0,mw,mh,kind,o={}){const R=T.R,S=5,vis=new Uint8Array(mw*mh),L=o.L??T.h[tI(T,x0,y0)];
+  tRect(T,x0,y0,mw*S+2,mh*S+2,(i)=>{T.h[i]=L;T.k[i]=kind;if(o.ws!=null)T.ws[i]=RSTY[o.ws]});
+  const carve=(x,y,w,h)=>tRect(T,x,y,w,h,i=>{T.k[i]=o.floor??TK.G});
+  const cell=(i,j)=>carve(x0+2+i*S,y0+2+j*S,3,3);const st=[[0,0]];vis[0]=1;cell(0,0);
+  while(st.length){const [i,j]=st[st.length-1],nb=[[1,0],[-1,0],[0,1],[0,-1]].map(([a,b])=>[i+a,j+b]).filter(([a,b])=>a>=0&&b>=0&&a<mw&&b<mh&&!vis[b*mw+a]);
+    if(!nb.length){st.pop();continue}const [a,b]=nb[R()*nb.length|0];vis[b*mw+a]=1;cell(a,b);
+    if(a!==i)carve(x0+2+Math.min(a,i)*S+3,y0+2+j*S,2,3);else carve(x0+2+i*S,y0+2+Math.min(b,j)*S+3,3,2);st.push([a,b])}
+  /* quelques passages en plus pour éviter un seul chemin */
+  for(let n=0;n<(o.extra??Math.round(mw*mh/10));n++){const i=R()*(mw-1)|0,j=R()*mh|0;carve(x0+2+i*S+3,y0+2+j*S,2,3)}
+  return {cell:(i,j)=>[x0+2+i*S+1,y0+2+j*S+1]}}
+/* rectangle de murs (fort, temple) avec portes */
+function tWallRect(T,x0,y0,w,h,o={}){const t=o.t||2;tRect(T,x0,y0,w,h,i=>{T.k[i]=TK.FLOOR});
+  tRect(T,x0,y0,w,t,i=>{T.k[i]=TK.WALL;T.ws[i]=RSTY[o.ws||'stone']});tRect(T,x0,y0+h-t,w,t,i=>{T.k[i]=TK.WALL;T.ws[i]=RSTY[o.ws||'stone']});
+  tRect(T,x0,y0,t,h,i=>{T.k[i]=TK.WALL;T.ws[i]=RSTY[o.ws||'stone']});tRect(T,x0+w-t,y0,t,h,i=>{T.k[i]=TK.WALL;T.ws[i]=RSTY[o.ws||'stone']})}
+function tOpen(T,x,y,w,h,k=TK.FLOOR){tRect(T,x,y,w,h,i=>{T.k[i]=k})}
+/* ---------- collisions : grille de 8 px ---------- */
+function tCol(T){const {tw,th,h,k}=T,cw=tw*2,chh=th*2,C=new Uint8Array(cw*chh);T.cw=cw;T.chh=chh;const B=(cx,cy)=>{if(cx>=0&&cy>=0&&cx<cw&&cy<chh)C[cy*cw+cx]=1};
+  const pass=q=>q===TK.RAMP||q===TK.BRIDGE;
+  for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const i=y*tw+x,v=h[i],q=k[i],X=2*x,Y=2*y;
+    if(q===TK.WATER||q===TK.VOID||q===TK.HEDGE||q===TK.WALL){B(X,Y);B(X+1,Y);B(X,Y+1);B(X+1,Y+1);continue}
+    if(q===TK.BRIDGE)continue;
+    if(q!==TK.RAMP){let cl=false;for(let j=1;j<=CH;j++){if(y-j<0)break;if(h[i-j*tw]>v&&!pass(k[i-j*tw])){cl=true;break}}if(cl){B(X,Y);B(X+1,Y);B(X,Y+1);B(X+1,Y+1);continue}}
+    if(y>0&&h[i-tw]<v&&!pass(k[i-tw])){B(X,Y)&&0;B(X,Y);B(X+1,Y)}
+    if(x>0&&h[i-1]<v&&!pass(k[i-1])){B(X,Y);B(X,Y+1)}
+    if(x<tw-1&&h[i+1]<v&&!pass(k[i+1])){B(X+1,Y);B(X+1,Y+1)}}
+  T.col=C;return C}
+function tBlk(T,x,y){const cx=x>>3,cy=y>>3;if(cx<0||cy<0||cx>=T.cw||cy>=T.chh)return true;return T.col[cy*T.cw+cx]===1}
+function tLevel(T,x,y){const cx=x>>4,cy=y>>4;return tIn(T,cx,cy)?T.h[tI(T,cx,cy)]:0}
+function tFree(T,x,y,r){return !(tBlk(T,x-r,y)||tBlk(T,x+r,y)||tBlk(T,x,y-r)||tBlk(T,x,y+r*.6)||tBlk(T,x-r*.7,y-r*.7)||tBlk(T,x+r*.7,y-r*.7))}
+/* ---------- solides : grille de 64 px ---------- */
+function sgBuild(w){const G_=new Map();for(const s of w.solids){const x0=Math.floor((s.x-16)/64),x1=Math.floor((s.x+s.w+16)/64),y0=Math.floor((s.y-16)/64),y1=Math.floor((s.y+s.h+16)/64);
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const key=x+y*1000;let a=G_.get(key);if(!a)G_.set(key,a=[]);a.push(s)}}w._sg=G_;w._sgn=w.solids.length;w._sga=w.solids}
+{const _b=blockedAt;blockedAt=function(w,x,y,r){if(!w||!w.ter)return _b(w,x,y,r);
+  if(x<r||y<r+4||x>w.w-r||y>w.h-r)return true;if(!tFree(w.ter,x,y,r))return true;
+  if(w._sgn!==w.solids.length||w._sga!==w.solids)sgBuild(w);const a=w._sg.get(Math.floor(x/64)+Math.floor(y/64)*1000);
+  if(a)for(const s of a)if(x>s.x-r&&x<s.x+s.w+r&&y>s.y-r&&y<s.y+s.h+r)return true;return false}}
+/* ---------- dessin d'un morceau de 256 px ---------- */
+function rTile(c,sty,col,row,dx,dy,sx=0,sw=16){c.drawImage(IMG.relief,col*16+sx,(sty*5+row)*16,sw,16,dx+sx,dy,sw,16)}
+function rX(c,col,row,dx,dy){c.drawImage(IMG.relief,col*16,(RXB+row)*16,16,16,dx,dy,16,16)}
+function nine(c,col0,row0,n,s,w,e,dx,dy){rX(c,col0+(!w?0:!e?2:1),row0+(!n?0:!s?2:1),dx,dy)}
+function floorTile(c,T,x,y,X,Y,edge){const P=T.pave||['#6f695e','#a9a294','#9c9588','#b4ad9f','#8e8a7c'];c.fillStyle=P[0];c.fillRect(X,Y,16,16);
+  for(let r=0;r<3;r++){let xx=X-((r+y)%2?5:0),j=0;while(xx<X+16){const bw=7+(hsh(x*7+j,y*3+r,11)*5|0),v=hsh(x+j,y+r,12),a=Math.max(X,xx),b=Math.min(X+16,xx+bw-1);if(b>a){c.fillStyle=v<.3?P[1]:v<.6?P[2]:v<.9?P[3]:P[4];c.fillRect(a,Y+r*5+1,b-a,4);c.fillStyle='rgba(255,255,255,.12)';c.fillRect(a,Y+r*5+1,b-a,1)}xx+=bw;j++}}
+  if(T.moss&&hsh(x,y,13)<.18){c.fillStyle='rgba(90,140,60,.55)';c.fillRect(X+(hsh(x,y,14)*10|0),Y+(hsh(x,y,15)*10|0),5,3)}
+  c.fillStyle='rgba(0,0,0,.22)';if(edge[0])c.fillRect(X,Y,16,1);if(edge[1])c.fillRect(X,Y+15,16,1);if(edge[2])c.fillRect(X,Y,1,16);if(edge[3])c.fillRect(X+15,Y,1,16)}
+function groundTile(c,T,x,y,px_,py_){const n=T.ground[hsh(x,y,1)<.8?0:1],r=AT[n];if(r)sub(c,n,r[2]>16?8:0,r[3]>16?8:0,16,16,px_,py_)}
+function terChunk(T,cx,cy){const o=cnv(CW,CW),c=o.getContext('2d');c.imageSmoothingEnabled=false;const X0=cx*CW,Y0=cy*CW;c.translate(-X0,-Y0);
+  const {tw,th,h,k,s}=T,a0=Math.max(0,(X0>>4)-1),a1=Math.min(tw-1,((X0+CW)>>4)),b0=Math.max(0,(Y0>>4)-1),b1=Math.min(th-1,((Y0+CW)>>4)+1);
+  const K=(x,y)=>tIn(T,x,y)?k[tI(T,x,y)]:-1,Hh=(x,y)=>tIn(T,x,y)?h[tI(T,x,y)]:-99,ge=(x,y,L)=>!tIn(T,x,y)||h[tI(T,x,y)]>=L;
+  /* 1. sol, eau, glace, chemins, planchers, vide */
+  for(let y=b0;y<=b1;y++)for(let x=a0;x<=a1;x++){const q=k[tI(T,x,y)],X=x*16,Y=y*16;
+    if(q===TK.VOID||q===TK.BRIDGE){c.fillStyle='#16110d';c.fillRect(X,Y,16,16);if(hsh(x,y,3)<.2){c.fillStyle='#231a14';c.fillRect(X+(hsh(x,y,4)*12|0),Y+(hsh(x,y,5)*12|0),3,2)}
+      if(q===TK.BRIDGE){const sm=t=>K(x,y+t)===TK.BRIDGE,sw_=t=>K(x+t,y)===TK.BRIDGE;nine(c,9,0,sm(-1),sm(1),sw_(-1),sw_(1),X,Y)}continue}
+    if(q===TK.PLANK){const pk=(a,b)=>{const z=K(a,b);return z===TK.PLANK||z===TK.RAMP&&Hh(a,b)>=Hh(x,y)};nine(c,9,0,pk(x,y-1),pk(x,y+1),pk(x-1,y),pk(x+1,y),X,Y);continue}
+    groundTile(c,T,x,y,X,Y);
+    if(q===TK.WATER||q===TK.ICE){const wq=(a,b)=>{const z=K(a,b);return z===q||z===-1};const lc=q===TK.ICE?12:T.lake;nine(c,lc,3,wq(x,y-1),wq(x,y+1),wq(x-1,y),wq(x+1,y),X,Y);continue}
+    if(q===TK.FLOOR){const fq=(a,b)=>{const z=K(a,b);return z===TK.FLOOR||z===TK.WALL||z===-1};floorTile(c,T,x,y,X,Y,[!fq(x,y-1),!fq(x,y+1),!fq(x-1,y),!fq(x+1,y)]);continue}
+    if(q===TK.PATH){const nm=T.road,r=AT[nm];if(!r)continue;const pq=(a,b)=>{const z=K(a,b);return z===q||z===TK.RAMP||z===TK.FLOOR||z===-1};
+      const n_=pq(x,y-1),s_=pq(x,y+1),w_=pq(x-1,y),e_=pq(x+1,y);if(r[2]>=48)sub(c,nm,(!w_?0:!e_?32:16),(!n_?0:!s_?32:16),16,16,X,Y);else sub(c,nm,0,0,16,16,X,Y);continue}
+    if(q===TK.G&&T.deco.length&&hsh(x,y,7)<T.decoN){const d=T.deco[hsh(x,y,8)*T.deco.length|0];sub(c,d,0,0,16,16,X+(hsh(x,y,9)*4|0)-2,Y+(hsh(x,y,10)*4|0)-2)}}
+  if(!ready(IMG.relief))return o;
+  /* 2. étages : falaises puis dessus, du plus bas au plus haut */
+  for(let L=T.minH+1;L<=T.maxH;L++){
+    for(let y=b0;y<=b1;y++)for(let x=a0;x<=a1;x++){const i=tI(T,x,y);if(h[i]>=L||k[i]===TK.BRIDGE)continue;let q=0;for(let j=1;j<=CH;j++){if(y-j<0)break;if(h[i-j*tw]>=L){q=j;break}}if(!q)continue;
+      if(k[i]===TK.RAMP)continue;const own=tI(T,x,y-q),st=s[own];
+      const cl=xx=>tIn(T,xx,y)&&h[tI(T,xx,y)]<L&&k[tI(T,xx,y)]!==TK.RAMP&&ge(xx,y-q,L);
+      const cc=cl(x-1)&&cl(x+1)?5:cl(x+1)?4:cl(x-1)?6:5;rTile(c,st,cc,q===1?0:2,x*16,y*16)}
+    for(let y=b0;y<=b1;y++)for(let x=a0;x<=a1;x++){const i=tI(T,x,y);if(h[i]!==L||k[i]===TK.VOID||k[i]===TK.BRIDGE)continue;
+      const n_=ge(x,y-1,L),w_=ge(x-1,y,L),e_=ge(x+1,y,L),st=s[i],X=x*16,Y=y*16;
+      const col=!w_&&!e_?0:!w_?1:!e_?3:2,row=n_?1:0;rTile(c,st,col,row,X,Y);
+      if(n_&&w_&&!ge(x-1,y-1,L))rTile(c,st,0,3,X,Y);if(n_&&e_&&!ge(x+1,y-1,L))rTile(c,st,1,3,X,Y);
+      if(k[i]===TK.PLANK){const pk=(a,b)=>K(a,b)===TK.PLANK;nine(c,9,0,pk(x,y-1),pk(x,y+1),pk(x-1,y),pk(x+1,y),X,Y)}}
+    /* rampes de cet étage */
+    for(const r of T.ramps){if(r.L!==L)continue;if(r.x*16>X0+CW||(r.x+r.w)*16<X0||r.y*16>Y0+CW||(r.y+CH)*16<Y0)continue;
+      for(let q=0;q<CH;q++){const Y=(r.y+q)*16,row=q===0?0:2;
+        if(r.type==='ladder'){const lc=r.sty===RSTY.snow||r.sty===RSTY.ice||r.sty===RSTY.stone?12:13;for(let dx=0;dx<r.w;dx++){rTile(c,r.sty,5,q===0?0:2,(r.x+dx)*16,Y)}c.drawImage(IMG.relief,lc*16,(RXB+(q===0?0:2))*16,16,16,(r.x+(r.w>>1))*16,Y,16,16);continue}
+        for(let dx=0;dx<r.w;dx++){const X=(r.x+dx)*16;if(r.w===1){rTile(c,r.sty,7,row,X,Y);continue}
+          if(dx===0){rTile(c,r.sty,7,row,X,Y,0,8);rTile(c,r.sty,7,row,X-4,Y,12,4);c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X+8,Y,8,16)}
+          else if(dx===r.w-1){rTile(c,r.sty,7,row,X,Y,8,8);c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X,Y,8,16)}
+          else{c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X,Y,8,16);c.drawImage(IMG.relief,7*16+4,(r.sty*5+row)*16,8,16,X+8,Y,8,16)}}}}}
+  /* 3. murs (pierre, grès) et haies */
+  for(let y=b0;y<=b1;y++)for(let x=a0;x<=a1;x++){const i=tI(T,x,y),q=k[i],X=x*16,Y=y*16;
+    if(q===TK.WALL){const wq=(a,b)=>K(a,b)===TK.WALL,n_=wq(x,y-1),s_=wq(x,y+1),w_=wq(x-1,y),e_=wq(x+1,y),st=T.ws[i];
+      const col=!w_&&!e_?0:!w_?1:!e_?3:2,row=!s_?2:!n_?0:1;rTile(c,st,col,row,X,Y);if(row===1&&n_&&w_&&!wq(x-1,y-1))rTile(c,st,0,3,X,Y);if(row===1&&n_&&e_&&!wq(x+1,y-1))rTile(c,st,1,3,X,Y)}
+    else if(q===TK.HEDGE){const hq=(a,b)=>K(a,b)===TK.HEDGE;nine(c,T.hedge||0,0,hq(x,y-1),hq(x,y+1),hq(x-1,y),hq(x+1,y),X,Y)}}
+  if(T.shade){c.fillStyle=T.shade;c.fillRect(X0,Y0,CW,CW)}
+  return o}
+/* ---------- miniature (carte, et en attendant qu'un morceau soit prêt) ---------- */
+function terMini(T){const s=4,o=cnv(T.tw*s,T.th*s),c=o.getContext('2d'),M=T.mini;const {tw,th,h,k}=T;
+  for(let y=0;y<th;y++)for(let x=0;x<tw;x++){const i=y*tw+x,q=k[i],v=h[i];let col;
+    let cl=false;if(q!==TK.RAMP)for(let j=1;j<=CH;j++){if(y-j<0)break;if(h[i-j*tw]>v&&k[i-j*tw]!==TK.BRIDGE){cl=true;break}}
+    if(q===TK.VOID)col='#1a1410';else if(q===TK.BRIDGE)col='#c88a50';else if(q===TK.WATER)col=M.water;else if(q===TK.ICE)col='#bfe2ee';else if(q===TK.WALL)col=T.ws[i]===RSTY.sandstone?'#c8a470':T.ws[i]===RSTY.hedge?'#3f7a34':T.ws[i]===RSTY.snow?'#dfe6ee':'#8e8e86';else if(q===TK.FLOOR)col=T.pave?T.pave[2]:'#9c9588';
+    else if(q===TK.HEDGE)col='#3f7a34';else if(q===TK.PLANK)col='#d08c4c';else if(cl)col=M.cliff;else if(q===TK.RAMP)col=M.ramp;else if(q===TK.PATH||q===TK.FLOOR)col=M.path;
+    else col=shade(M.g,1+.07*v-(hsh(x,y,2)<.5?.03:0));
+    c.fillStyle=col;c.fillRect(x*s,y*s,s,s)}
+  return o}
+function drawTer(c,ox,oy){const T=world.ter;let budget=world._cbud??2;const x0=Math.max(0,Math.floor(ox/CW)),y0=Math.max(0,Math.floor(oy/CW)),x1=Math.floor((ox+VW)/CW),y1=Math.floor((oy+VH)/CW);
+  for(let cy=y0;cy<=y1;cy++)for(let cx=x0;cx<=x1;cx++){if(cx*CW>=world.w||cy*CW>=world.h)continue;const key=cx+','+cy;let ch=T.cache.get(key);
+    if(ch){T.cache.delete(key);T.cache.set(key,ch)}else if(budget>0&&ready(IMG.atlas)&&ready(IMG.relief)){budget--;ch=terChunk(T,cx,cy);T.cache.set(key,ch)}
+    if(ch)c.drawImage(ch,cx*CW,cy*CW);else if(world.bg)c.drawImage(world.bg,cx*CW/4,cy*CW/4,CW/4,CW/4,cx*CW,cy*CW,CW,CW)}
+  /* préparation des morceaux voisins quand il reste du temps */
+  if(budget>0&&ready(IMG.relief))for(let cy=y0-1;cy<=y1+1&&budget>0;cy++)for(let cx=x0-1;cx<=x1+1&&budget>0;cx++){if(cx<0||cy<0||cx*CW>=world.w||cy*CW>=world.h)continue;const key=cx+','+cy;if(!T.cache.has(key)){budget--;T.cache.set(key,terChunk(T,cx,cy))}}
+  world._cbud=1;while(T.cache.size>44)T.cache.delete(T.cache.keys().next().value)}
+/* ---------- monstres loin de tous les joueurs : en sommeil ---------- */
+{const _um=updMob;updMob=function(e,dt){if(world.ter&&!e.aggro){let near=false;for(const p of G.players)if(Math.abs(p.x-e.x)<700&&Math.abs(p.y-e.y)<500){near=true;break}
+    if(!near&&typeof NET!=='undefined'&&NET.remote)for(const k in NET.remote){const r=NET.remote[k];if(Math.abs(r.x-e.x)<700&&Math.abs(r.y-e.y)<500){near=true;break}}if(!near)return}return _um(e,dt)}}
+/* l'hôte n'envoie que les monstres proches d'un joueur */
+{const _ms=mobState;mobState=function(){const o=_ms();if(!world.ter)return o;const P=[...G.players.map(p=>[p.x,p.y])];for(const k in NET.remote){const r=NET.remote[k];P.push([r.x,r.y])}
+  o.e=o.e.filter(a=>P.some(([x,y])=>Math.abs(a[2]-x)<760&&Math.abs(a[3]-y)<560));return o}}
+
+/* ===================== v20 : plans des quatre grandes régions (4800 × 3200) ===================== */
+const BIGW=4800,BIGH=3200,TW_=300,TH_=200;
+const wav=(a,f,p)=>x=>a*Math.sin(x*f+p);
+/* chaque plan rend : T (grille) + infos de placement (forêts, rochers, coffres, meutes, décor, étiquettes) */
+const TDEF={
+plaine(){const T=Ter('plaine',TW_,TH_,{sty:'grass',ground:['grass','grass2'],road:'road9',lake:6,seed:101,deco:['flower_y','flower_o','flower_r','grass_tuft','grass_tuft','bush1'],decoN:.1,floor:'road9',hedge:0,moss:1,
+    mini:{g:'#8fbf58',cliff:'#8a5a40',ramp:'#c8a070',path:'#d8bc84',water:'#4f8fb8'}});
+  const n1=wav(9,.05,0),n2=wav(5,.13,1),n3=wav(7,.07,2),n4=wav(4,.19,0);
+  tNorth(T,1,x=>118+n1(x)+n2(x));tNorth(T,2,x=>50+n3(x)+n4(x));
+  tRaise(T,262,24,15,8,3,{rough:.15});
+  /* terrasse plate du labyrinthe */
+  tRect(T,8,0,74,113,(i,x,y)=>{T.h[i]=y<54?2:1});
+  /* fort sur le niveau bas */
+  tRect(T,206,126,58,50,i=>{T.h[i]=0});
+  /* crevasse et lac au fond, ponton vers l'îlot */
+  tLower(T,150,166,52,22,-1,{rough:.18});tKind(T,152,173,34,11,TK.WATER,{rough:.15});tRect(T,148,171,7,4,i=>{T.k[i]=TK.G});tRect(T,150,158,3,14,i=>{if(T.k[i]===TK.WATER)T.k[i]=TK.PLANK});
+  const mz=tMaze(T,12,58,12,9,TK.WALL,{L:1,extra:9,ws:'hedge'});tOpen(T,72,80,2,3,TK.G);
+  tWallRect(T,212,130,46,40,{ws:'stone'});tOpen(T,232,168,6,2);tOpen(T,212,146,2,5);
+  for(const [x,y,w,h] of [[220,130,5,2],[247,168,4,2],[256,138,2,4]])tOpen(T,x,y,w,h,TK.FLOOR);
+  tRect(T,224,142,22,2,(i)=>{T.k[i]=TK.WALL;T.ws[i]=RSTY.stone});tOpen(T,232,142,6,2);
+  tFlat(T,150,86,9,1);tFlat(T,150,4,4,2);tFlat(T,296,92,4,1);tFlat(T,40,160,5,0);tFlat(T,262,22,4,3);
+  tClean(T);
+  for(const [x,y] of [[146,40],[100,40],[232,40],[150,100],[40,108],[200,100],[262,100],[130,138],[172,138],[256,22]])tRamp(T,x,y,3);
+  tPath(T,[[150,0],[148,30],[147,50],[150,70],[150,86]]);tPath(T,[[150,86],[200,88],[250,90],[299,92]]);tPath(T,[[150,86],[110,90],[76,82]]);
+  tPath(T,[[150,86],[151,110],[150,128],[131,138],[131,146]]);tPath(T,[[151,128],[120,130],[80,140],[41,124],[41,150],[42,160]]);tPath(T,[[151,128],[200,128],[235,166]]);
+  tPath(T,[[150,86],[220,70],[233,52],[245,36],[257,30]]);
+  T.labels=[[40*16,84*16,'Labyrinthe des Ronces'],[235*16,152*16,'Fort de la Vieille Garde'],[150*16,180*16,'Lac de la Crevasse'],[262*16,14*16,'Colline du sanctuaire']];
+  T.place={camp:[150,86],exits:[{to:'capitale',x:2400,y:6},{to:'foret',x:4794,y:92*16}],dun:{golem:[40*16,158*16],liche:[235*16,136*16],wyrm:[262*16,20*16]},
+    forests:[[50,22,26,2],[210,26,22,2],[40,175,26,0],[105,182,18,0],[270,110,22,1],[190,104,14,1],[288,182,18,0],[110,62,12,2]],rocks:[[20,140,12],[195,178,10],[285,58,10]],
+    chests:[mz.cell(0,8),mz.cell(5,0),[151,173],[235,157],[226,136],[280,190],[12,10],[200,40]],
+    packs:[[45,80],[30,95],[60,64],[225,150],[245,158],[235,137],[140,165],[165,182],[262,28]],
+    deco:[['c_pillar_h',220,134],['c_pillar_h',250,134],['c_statue_h',235,152],['c_pillar_h',228,160],['c_pillar_h',243,160],['c_statue_h',76,96]]};
+  return T},
+foret(){const T=Ter('foret',TW_,TH_,{sty:'forest',ground:['grassd','grassd'],road:'road9',lake:6,seed:202,shade:'rgba(0,30,12,.16)',deco:['grass_tuft','grass_tuft','bush2','flower_y'],decoN:.08,floor:'road9',hedge:3,moss:1,
+    mini:{g:'#5f9a48',cliff:'#6a4634',ramp:'#a8845c',path:'#b89c70',water:'#3a6a5a'}});
+  tRaise(T,60,40,44,24,1);tRaise(T,70,36,20,10,2,{rough:.15});tRaise(T,250,165,45,24,1);tRaise(T,175,25,22,12,1);tRaise(T,40,150,26,16,1);
+  const rv=[[118,0],[128,40],[150,80],[170,112],[188,150],[196,199]];
+  for(let s=0;s<rv.length-1;s++){const [ax,ay]=rv[s],[bx,by]=rv[s+1],n=Math.ceil(Math.hypot(bx-ax,by-ay));for(let j=0;j<=n;j++){const x=ax+(bx-ax)*j/n,y=ay+(by-ay)*j/n;
+    tRect(T,Math.round(x-4),Math.round(y),9,1,i=>{T.k[i]=TK.VOID;T.h[i]=-3})}}
+  const tx=228,ty=62;tRaise(T,tx,ty,30,20,1,{sty:'bark',rough:.12});tRaise(T,tx-2,ty-4,20,13,2,{sty:'bark',rough:.12});tRaise(T,tx+2,ty-8,12,8,3,{sty:'bark',rough:.1});tRaise(T,tx,ty-11,7,5,4,{sty:'bark',rough:.08});
+  tKind(T,40,100,12,7,TK.WATER,{rough:.2});
+  tWallRect(T,62,170,26,20,{ws:'stone'});tOpen(T,72,188,6,2);tOpen(T,62,176,2,5);tOpen(T,78,170,5,2);
+  tFlat(T,100,100,9,0);tFlat(T,4,104,4,0);tFlat(T,150,195,4,0);tFlat(T,tx,ty-12,3,4);
+  tClean(T);
+  for(const [bx,by] of [[123,22],[160,96],[192,170]])tRect(T,bx-7,by,16,3,(i)=>{if(T.k[i]===TK.VOID){T.k[i]=TK.BRIDGE}});
+  for(const [x,y] of [[60,52],[70,40],[250,172],[175,30],[40,156]])tRamp(T,x,y,3);
+  const lad=[tRamp(T,tx,ty+16,2,'ladder'),tRamp(T,tx-8,ty+8,2,'ladder'),tRamp(T,tx+6,ty-1,2,'ladder'),tRamp(T,tx-1,ty-8,2,'ladder')];
+  /* passerelles de planches entre les échelles, sur chaque étage de l'arbre */
+  const walk=(L,pts)=>{for(let s_=0;s_<pts.length-1;s_++){const [ax,ay]=pts[s_],[bx,by]=pts[s_+1],n=Math.ceil(Math.hypot(bx-ax,by-ay)*2);for(let j=0;j<=n;j++){const x=Math.round(ax+(bx-ax)*j/n),y=Math.round(ay+(by-ay)*j/n);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!tIn(T,x+dx,y+dy))continue;const i=tI(T,x+dx,y+dy);if(T.h[i]===L&&T.k[i]===TK.G)T.k[i]=TK.PLANK}}}};
+  for(let L=1;L<=3;L++){const a=lad[L-1],b=lad[L];if(a&&b)walk(L,[[a.x+1,a.y-2],[(a.x+b.x)/2+(L%2?-6:6),(a.y+b.y+CH)/2],[b.x+1,b.y+CH+1]])}
+  if(lad[3])walk(4,[[lad[3].x+1,lad[3].y-2],[tx,ty-12]]);
+  tPath(T,[[0,104],[20,113],[60,113],[100,100]]);tPath(T,[[100,100],[120,60],[118,30],[114,23],[132,23],[160,40],[210,82],[228,86]]);tPath(T,[[100,100],[140,110],[150,97],[170,97],[200,120],[230,150],[250,190]]);
+  tPath(T,[[100,100],[120,140],[160,165],[183,171],[202,171],[170,180],[150,199]]);tPath(T,[[100,100],[90,140],[75,170],[75,188]]);
+  T.labels=[[tx*16,(ty+24)*16,'Arbre-Monde'],[123*16,30*16,'Ravin des Murmures'],[75*16,192*16,'Ruines envahies'],[40*16,112*16,'Étang des fées']];
+  T.place={camp:[100,100],exits:[{to:'plaine',x:6,y:104*16},{to:'desert',x:2400,y:3194}],dun:{frog:[tx*16,(ty-12)*16]},
+    forests:[[40,62,24,0],[200,24,20,0],[275,100,22,0],[30,185,16,0],[240,130,18,0],[150,40,14,0],[90,130,18,0],[285,30,14,0],[30,22,16,1],[150,150,14,0],[120,185,14,0]],rocks:[[150,130,10],[275,192,10]],
+    chests:[[tx,ty-14],[tx-10,ty-4],[75,180],[40,110],[66,32],[250,160],[150,180],[290,20]],
+    packs:[[tx,ty+6],[tx-8,ty-2],[tx+6,ty-8],[75,180],[60,40],[250,165],[150,150],[175,24]],
+    deco:[['c_statue_h',75,178],['c_pillar_h',68,182],['c_pillar_h',82,182],['bigtree_pink',32,96],['bigtree_pink',50,93]],canopy:[tx,ty,30,20]};
+  return T},
+desert(){const T=Ter('desert',TW_,TH_,{sty:'sand',ground:['f_orange','f_orange'],road:'sand9',lake:9,seed:303,deco:['rock_grey_s'],decoN:.025,floor:'sand9',pave:['#8a6640','#d8b47a','#c9a06a','#e6c890','#b0875a'],
+    mini:{g:'#e8a860',cliff:'#9a5a40',ramp:'#f2ad7d',path:'#f0c890',water:'#5ab0c8'}});
+  tRaise(T,60,48,46,26,1);tRaise(T,58,44,22,12,2,{rough:.15});tRaise(T,240,56,52,24,1);tRaise(T,240,150,56,34,1);tRaise(T,240,146,30,17,2,{rough:.15});tRaise(T,150,176,40,10,1);
+  tLower(T,140,112,30,18,-1,{rough:.16});tKind(T,142,118,16,8,TK.WATER,{rough:.2});
+  tRect(T,14,118,80,62,(i)=>{T.h[i]=0;T.k[i]=TK.G});
+  tWallRect(T,16,120,76,58,{ws:'sandstone'});for(const x of [40,66])tRect(T,x,120,2,58,i=>{T.k[i]=TK.WALL;T.ws[i]=RSTY.sandstone});for(const y of [138,158])tRect(T,16,y,76,2,i=>{T.k[i]=TK.WALL;T.ws[i]=RSTY.sandstone});
+  for(const [x,y,w,h] of [[52,176,6,2],[40,126,2,5],[40,164,2,5],[66,144,2,5],[66,128,2,5],[24,138,5,2],[72,138,5,2],[50,158,5,2],[80,158,5,2],[90,148,2,5]])tOpen(T,x,y,w,h);
+  tFlat(T,150,42,9,0);tFlat(T,150,4,4,0);tFlat(T,296,100,4,0);tFlat(T,240,140,4,2);
+  tClean(T);
+  for(const [x,y] of [[60,62],[58,48],[240,70],[226,170],[254,170],[240,156],[150,178],[130,88],[150,88]])tRamp(T,x,y,3);
+  tPath(T,[[150,0],[150,42]]);tPath(T,[[150,42],[200,80],[250,90],[299,100]]);tPath(T,[[150,42],[140,80],[131,92],[131,100]]);tPath(T,[[150,42],[100,90],[60,110],[55,118]]);tPath(T,[[200,80],[226,120],[227,170],[227,188]]);
+  T.labels=[[54*16,148*16,'Temple enseveli'],[140*16,132*16,'Oasis du Puits'],[240*16,132*16,'Mesa du Samouraï'],[60*16,40*16,'Plateau des vents']];
+  T.place={camp:[150,42],exits:[{to:'foret',x:2400,y:6},{to:'pics',x:4794,y:1600}],dun:{samurai:[240*16,140*16]},
+    forests:[[140,112,18,-1],[275,110,12,0],[110,60,12,0]],rocks:[[100,30,14],[200,192,14],[280,20,12],[120,150,12],[30,85,12],[200,110,10]],
+    chests:[[28,128],[78,128],[28,168],[78,168],[53,148],[140,108],[58,40],[290,190]],
+    packs:[[28,130],[54,130],[80,130],[28,150],[78,150],[54,168],[140,104],[240,150],[60,46],[150,176]],
+    deco:[['c_statue_h',53,146],['c_pillar_h',48,144],['c_pillar_h',58,144],['c_pillar_h',30,126],['c_pillar_h',76,126]],palms:[140,112,22]};
+  return T},
+pics(){const T=Ter('pics',TW_,TH_,{sty:'snow',ground:['f_white','f_white'],road:'snow9',lake:12,seed:404,deco:['rock_grey_s'],decoN:.02,floor:'snow9',hedge:6,
+    mini:{g:'#eef2f6',cliff:'#5f7160',ramp:'#b8dce5',path:'#c8d4dc',water:'#7fb8d8'}});
+  tRaise(T,205,58,70,40,1);tRaise(T,215,50,45,26,2,{rough:.18});tRaise(T,222,40,22,13,3,{rough:.15});
+  tRaise(T,58,42,40,22,1);tRaise(T,55,37,20,11,2,{rough:.15});tRaise(T,150,166,50,22,1);
+  tLower(T,95,124,40,22,-1,{rough:.16});tKind(T,97,127,30,14,TK.ICE,{rough:.15});
+  for(const [x,y] of [[34,150],[46,148],[28,166],[44,170]])tRect(T,x,y,6,4,i=>{T.k[i]=TK.WALL;T.ws[i]=RSTY.ice});
+  tFlat(T,152,106,9,0);tFlat(T,4,104,4,0);tFlat(T,222,36,4,3);tFlat(T,55,32,3,2);
+  tClean(T);
+  for(const [x,y] of [[180,80],[240,92],[205,66],[232,64],[58,56],[52,44],[150,180],[80,98],[115,98]])tRamp(T,x,y,3);
+  tRamp(T,224,46,2,'ladder');
+  tPath(T,[[0,104],[60,104],[152,106]]);tPath(T,[[152,106],[181,100],[200,80],[206,70],[225,56],[225,44]]);tPath(T,[[152,106],[150,150],[151,190]]);tPath(T,[[60,104],[59,70],[53,46]]);tPath(T,[[60,104],[40,140],[38,158]]);
+  T.labels=[[222*16,28*16,'Sommet du Kraken'],[55*16,28*16,'Belvédère'],[97*16,142*16,'Lac gelé'],[38*16,160*16,'Camp des yétis'],[150*16,178*16,'Sanctuaire caché']];
+  T.place={camp:[152,106],exits:[{to:'desert',x:6,y:1664}],dun:{squid:[222*16,36*16]},
+    forests:[[130,60,18,0],[200,124,20,0],[280,170,18,0],[40,185,14,0],[265,22,14,0],[190,40,16,1],[28,30,12,1],[120,184,12,1]],rocks:[[260,130,12],[100,172,10],[20,90,10]],
+    chests:[[97,127],[55,34],[150,170],[38,160],[222,40],[270,190],[290,60],[10,190]],
+    packs:[[38,158],[30,170],[97,122],[210,52],[244,60],[150,166],[56,40],[260,110]],
+    deco:[['torii',150,164],['tower_w',55,30],['c_tent',36,156],['c_tent',46,164]]};
+  return T}};
+function terOf(id){if(TERC[id])return TERC[id];const T=TDEF[id]();tCol(T);
+  let mn=99,mx=-99;for(let i=0;i<T.n;i++){mn=Math.min(mn,T.h[i]);mx=Math.max(mx,T.h[i])}T.minH=mn;T.maxH=mx;
+  return TERC[id]=T}
+/* ---------- nouvelles dimensions et lieux ---------- */
+for(const id of ['plaine','foret','desert','pics']){const L=RLAY[id],T=terOf(id),P=T.place;L.w=BIGW;L.h=BIGH;L.big=true;L.camp=[P.camp[0]*16,P.camp[1]*16];L.exits=P.exits;L.dun=P.dun;L.poi=[];
+  for(const k in L.nodes)L.nodes[k]=Math.round(L.nodes[k]*3.2);REG[id].exits=L.exits;for(const d in L.dun){DUNGEONS[d].x=L.dun[d][0];DUNGEONS[d].y=L.dun[d][1]}}
+/* ---------- construction d'une grande région ---------- */
+function buildBig(id){const R=REG[id],LY=RLAY[id],T=terOf(id),P=T.place,W=LY.w,H=LY.h,[cx,cy]=LY.camp,Rn=mulb(55+id.length*31);
+  const w={kind:'field',id,tier:R.tier,dmul:1+.4*(R.tier-1),name:R.n,w:W,h:H,bgFn:()=>terMini(T),bg:null,ter:T,big:true,solids:[],trig:[],enemies:[],boss:null,props:[],npcs:[],nodes:[],packs:[],lamps:[]};
+  const dun=Object.keys(LY.dun),cellK=(x,y)=>{const a=x>>4,b=y>>4;return tIn(T,a,b)?T.k[tI(T,a,b)]:-1},lev=(x,y)=>tLevel(T,x,y);
+  const res=[];const reserve=(x,y,r)=>res.push([x,y,r]);
+  reserve(cx,cy,150);for(const e of LY.exits)reserve(e.x,e.y,100);for(const k of dun)reserve(LY.dun[k][0],LY.dun[k][1],70);
+  const flatAt=(x,y,r)=>{const L=lev(x,y);for(const [dx,dy] of [[-r,0],[r,0],[0,-r],[0,r],[0,0]])if(lev(x+dx,y+dy)!==L)return false;return true};
+  const free=(x,y,pad=10,road=false)=>x>24&&y>30&&x<W-24&&y<H-16&&T.s[tI(T,x>>4,y>>4)]!==RSTY.bark&&!res.some(([a,b,r])=>dist(x,y,a,b)<r)&&!blockedAt(w,x,y,pad)&&(road||cellK(x,y)===TK.G||cellK(x,y)===TK.PLANK)&&flatAt(x,y,pad+8);
+  const add=(n,x,y,sol=[-4,-4,8,5])=>{w.props.push({type:'spr',n,x,y});if(sol)w.solids.push({x:x+sol[0],y:y+sol[1],w:sol[2],h:sol[3]})};
+  /* décor fixe des structures */
+  for(const [n,x,y] of P.deco||[]){const X=x*16+8,Y=y*16+8;add(n,X,Y,n.startsWith('bigtree')||n==='torii'||n==='tower_w'||n==='c_tent'?[-8,-6,16,6]:[-6,-5,12,5]);reserve(X,Y,18)}
+  /* camp */
+  w.props.push({type:'spr',n:'c_tent',x:cx-56,y:cy-14},{type:'spr',n:'c_tent',x:cx+58,y:cy-22},{type:'fire',x:cx,y:cy+8},{type:'spr',n:'c_logbench',x:cx-6,y:cy+42},{type:'spr',n:'n_sign',x:cx+90,y:cy+46},{type:'spr',n:'banner'+(1+R.tier%6),x:cx-92,y:cy+20});
+  w.solids.push({x:cx-78,y:cy-30,w:44,h:16},{x:cx+36,y:cy-38,w:44,h:16},{x:cx-12,y:cy-2,w:24,h:12},{x:cx-28,y:cy+34,w:44,h:8});
+  w.lamps.push({x:cx-110,y:cy+60},{x:cx+110,y:cy+60});w.trig.push({kind:'sign',x:cx+90,y:cy+56,r:16});
+  for(const k in NPCS){const N=NPCS[k];if(N.zone!==id)continue;const n={id:k,x:cx+(N.dx||0),y:cy+(N.dy||0)};w.npcs.push(n);w.trig.push({kind:'npc',id:k,x:n.x,y:n.y+8,r:20})}
+  /* arbre-monde : feuillage autour du tronc */
+  if(P.canopy){const [tx,ty,rx,ry]=P.canopy;for(let a=0;a<6.28;a+=.22){const x=(tx+Math.cos(a)*(rx+3))*16,y=(ty+Math.sin(a)*(ry+3))*16;if(cellK(x,y)===TK.G&&!blockedAt(w,x,y,8))add('bigtree_green',x,y,[-6,-5,12,5])}}
+  if(P.palms){const [px_,py_,r]=P.palms;for(let i=0;i<36;i++){const a=Rn()*6.28,d=r*(.6+Rn()*.5),x=(px_+Math.cos(a)*d)*16,y=(py_+Math.sin(a)*d*.7)*16;if(free(x,y,8))add('palm',x,y)}}
+  /* donjons */
+  for(const k of dun){const d=DUNGEONS[k];w.props.push({type:'portal',id:k,x:d.x,y:d.y});w.solids.push({x:d.x-31,y:d.y-10,w:13,h:10},{x:d.x+18,y:d.y-10,w:13,h:10});w.trig.push({kind:'dungeon',id:k,x:d.x,y:d.y-4,r:26,auto:false})}
+  /* forêts, arbres isolés, rochers */
+  for(const [fx,fy,fr] of P.forests)for(let i=0;i<fr*fr*.55;i++){const a=Rn()*6.3,d=Math.sqrt(Rn())*fr,x=(fx+Math.cos(a)*d)*16|0,y=(fy+Math.sin(a)*d*.8)*16|0;if(free(x,y,7))add(R.props[Rn()*R.props.length|0],x,y)}
+  for(let i=0;i<900;i++){const x=Rn()*W|0,y=Rn()*H|0;if(free(x,y,14))add(R.props[Rn()*R.props.length|0],x,y)}
+  for(const [rx_,ry_,rr] of P.rocks)for(let i=0;i<rr*rr*.25;i++){const a=Rn()*6.3,d=Math.sqrt(Rn())*rr,x=(rx_+Math.cos(a)*d)*16|0,y=(ry_+Math.sin(a)*d*.8)*16|0;if(free(x,y,10))add(R.rocks[Rn()*R.rocks.length|0],x,y,[-9,-7,18,7])}
+  if(id!=='desert'&&id!=='pics')for(let i=0;i<500;i++){const x=Rn()*W|0,y=Rn()*H|0;if(free(x,y,4))w.props.push({type:'spr',n:'bush'+(1+(Rn()*3|0)),x,y})}
+  /* coffres */
+  for(const [qx,qy] of P.chests){let x=qx*16+8,y=qy*16+8;for(let k=0;k<30&&blockedAt(w,x,y,9);k++){x=qx*16+8+(Rn()-.5)*k*12;y=qy*16+8+(Rn()-.5)*k*10}if(blockedAt(w,x,y,9))continue;
+    const ch={type:'chest',x,y,open:false,big:Rn()<.35};w.props.push(ch);w.solids.push({x:x-7,y:y-6,w:14,h:6});w.trig.push({kind:'chest',ch,x,y:y+8,r:16})}
+  for(const e of LY.exits)w.trig.push({kind:'exit',to:e.to,x:e.x,y:e.y,r:30,auto:true});
+  /* ressources */
+  const st=NODEST[id]=NODEST[id]||{};let ni=0;
+  for(const [type,cnt] of Object.entries(LY.nodes)){const D=NODEDEF[type];
+    for(let i=0,k=0;i<cnt&&k<900;k++){let x,y;const zone=type==='bois'?P.forests:type==='pierre'||type==='fer'?P.rocks:type==='cristal'?(Rn()<.5?P.rocks:null):null;
+      if(zone&&zone.length){const [zx,zy,zr]=zone[Rn()*zone.length|0],a=Rn()*6.3,d=zr*(.5+Rn()*.7);x=(zx+Math.cos(a)*d)*16|0;y=(zy+Math.sin(a)*d*.8)*16|0}else{x=40+Rn()*(W-80)|0;y=60+Rn()*(H-100)|0}
+      if(!free(x,y,12))continue;const v=Rn()*D.spr.length|0,key=type+ni;
+      const n={type,key,x,y,spr:D.spr[v],sc:D.sc[v],left:3};ni++;i++;w.nodes.push(n);w.props.push({type:'node',nd:n});if(type!=='herbe')w.solids.push({x:x-6,y:y-5,w:12,h:5});w.trig.push({kind:'node',nd:n,x,y:y+8,r:18})}}
+  /* meutes : dans les structures (plus fortes), puis dispersées */
+  const lvl=1+.6*(R.tier-1);
+  const pack=(x,y,o={})=>{const types=[LY.mobs[Rn()*LY.mobs.length|0],LY.mobs[Rn()*LY.mobs.length|0]],far=Math.min(.35,dist(x,y,cx,cy)/4000);
+    const pk={x,y,types,n:o.n||2+(Rn()*3|0),lv:lvl*(1+far)*(o.mul||1),elite:o.elite??Rn()<.3,t:0,ms:[]};w.packs.push(pk);spawnPack(w,pk)};
+  for(const [px_,py_] of P.packs){let x=px_*16+8,y=py_*16+8;for(let k=0;k<20&&blockedAt(w,x,y,10);k++){x=px_*16+8+(Rn()-.5)*k*14;y=py_*16+8+(Rn()-.5)*k*12}if(!blockedAt(w,x,y,10))pack(x,y,{mul:1.08,elite:Rn()<.6,n:3+(Rn()*2|0)})}
+  for(let i=0,k=0;i<46&&k<1500;k++){const x=80+Rn()*(W-160)|0,y=90+Rn()*(H-160)|0;if(dist(x,y,cx,cy)<420||LY.exits.some(e=>dist(x,y,e.x,e.y)<260)||!free(x,y,10,true))continue;
+    if(w.packs.some(p=>dist(p.x,p.y,x,y)<260))continue;pack(x,y);i++}
+  return w}
+{const _br=buildRegion;buildRegion=function(id){return RLAY[id]&&RLAY[id].big?buildBig(id):_br(id)}}
+/* ---------- rendu : fond par morceaux ---------- */
+/* (le dessin principal appelle drawTer quand world.ter existe, voir patch) */
+/* départ : si l'arrivée tombe dans un obstacle, on cherche la case libre la plus proche */
+{const _go=go;go=function(kind,arg){_go(kind,arg);if(!world||!world.ter)return;
+  for(const p of G.players){if(!blockedAt(world,p.x,p.y,5))continue;let best=null;for(let r=8;r<240&&!best;r+=8)for(let a=0;a<6.28;a+=.4){const x=p.x+Math.cos(a)*r,y=p.y+Math.sin(a)*r;if(!blockedAt(world,x,y,6)){best=[x,y];break}}if(best){p.x=best[0];p.y=best[1]}}
+  snapCam()}}
+/* ---------- carte : miniature réduite (mémoire) et noms des lieux ---------- */
+{const _ra=regionArt;regionArt=function(id){if(!RLAY[id]||!RLAY[id].big)return _ra(id);if(MAP.art['r-'+id])return MAP.art['r-'+id];
+  const L=RLAY[id],k=.25,o=document.createElement('canvas');o.width=L.w*k;o.height=L.h*k;const c=o.getContext('2d');const T=terOf(id);c.drawImage(terMini(T),0,0,o.width,o.height);
+  let w=world&&world.id===id?world:null;if(!w){try{w=buildRegion(id)}catch(e){w=null}}
+  if(w){c.save();c.scale(k,k);for(const p of w.props){if(p.type!=='spr')continue;const big=/tree|palm|pine/.test(p.n);c.fillStyle=big?'rgba(40,80,40,.55)':'rgba(90,80,70,.5)';if(id==='pics'&&big)c.fillStyle='rgba(60,80,90,.45)';c.fillRect(p.x-8,p.y-14,16,14)}c.restore()}
+  c.fillStyle='rgba(234,215,166,.16)';c.fillRect(0,0,o.width,o.height);return MAP.art['r-'+id]=o}}
+{const _fa=fogArt;fogArt=function(id){if(!RLAY[id]||!RLAY[id].big)return _fa(id);const key='f-'+id;const cached=MAP.art[key];if(cached&&cached.ver===fogVer)return cached.c;const L=RLAY[id],k=.125,[gw,gh]=fogGrid(id),f=fogGet(id);
+  const o=cached?cached.c:document.createElement('canvas');o.width=L.w*k;o.height=L.h*k;const c=o.getContext('2d');c.globalCompositeOperation='source-over';c.fillStyle='#d8c59a';c.fillRect(0,0,o.width,o.height);
+  c.globalCompositeOperation='destination-out';const cs=FOGC*k;
+  for(let y=0;y<gh;y++)for(let x=0;x<gw;x++)if(f[y*gw+x]==='1'){const px_=(x+.5)*cs,py_=(y+.5)*cs,g=c.createRadialGradient(px_,py_,0,px_,py_,cs*1.1);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.6,'rgba(0,0,0,.9)');g.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=g;c.fillRect(px_-cs*1.2,py_-cs*1.2,cs*2.4,cs*2.4)}
+  c.globalCompositeOperation='source-over';MAP.art[key]={c:o,ver:fogVer};return o}}
+{const _dr=drawRegion2;drawRegion2=function(c,t,poi,iz){_dr(c,t,poi,iz);const id=MAP.rid;if(!RLAY[id]||!RLAY[id].big)return;const T=terOf(id),Z=Math.min(iz,3);
+  for(const [x,y,n] of T.labels){if(!fogSeen(id,x,y)&&!isAdmin())continue;const a=x*.5,b=y*.5;c.font=`italic bold ${10*Z}px Georgia, serif`;c.textAlign='center';c.lineWidth=3*Z;c.strokeStyle='rgba(245,232,200,.9)';c.strokeText(n,a,b);c.fillStyle='#4a2c14';c.fillText(n,a,b)}}}
+
 migrate12(S);
 /* ===== Interface ===== */
 function renderRes(){
@@ -2869,7 +3189,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='19.0';
+const VERSION='20.0';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
