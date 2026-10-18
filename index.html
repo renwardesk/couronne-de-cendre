@@ -163,6 +163,9 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
 @media (max-width:600px){.top{max-width:84%;gap:4px}.chip{font-size:12px;border-width:6px;border-image-width:6px;gap:3px;padding:0 1px}.chip .pip{width:6px;height:6px}}
 .chwrap{display:flex;flex-direction:column;gap:4px}.chdel{font:inherit;font-size:12px;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:3px 6px;cursor:pointer}.chdel.arm{color:#fff;background:#8a2a1c;border-color:#d65a3c}
 .musics{display:flex;flex-direction:column;gap:6px}.mrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:6px}.mrow b{min-width:150px}.mrow .mn{flex:1;color:var(--muted);font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up{color:#7fe07a}.dn{color:#ff7a6a}.cmp s{color:#ff7a6a;opacity:.8}.card.slotsel{border-color:var(--sky);box-shadow:0 0 0 1px var(--sky) inset}.grade{display:inline-block;min-width:16px;text-align:center;border-radius:3px;padding:0 3px;color:#1a120a}.gS{background:#f0a030}.gA{background:#c07aff}.gB{background:#5fa8e8}.gC{background:#7fe07a}.gD{background:#d6d0c2}.gE{background:#8a8478}
+.ttree{width:100%;max-width:440px;display:block;margin:0 auto;background:radial-gradient(circle,#2a2218 0,#14110d 70%);border-radius:50%;touch-action:manipulation}.skl.no,.no{color:#ff7a6a}
+.ttree{max-width:380px}
 
 </style>
 </head>
@@ -248,7 +251,7 @@ const dirIdx=(fx,fy)=>Math.abs(fx)>Math.abs(fy)?(fx<0?2:3):(fy<0?1:0);
 const AU={ctx:null,buf:{},want:null,cur:null,src:null,g:null,muted:false};
 try{AU.muted=localStorage.getItem('cc-mute')==='1'}catch(e){}
 function audioInit(){if(AU.ctx)return;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;AU.ctx=new C();AU.master=AU.ctx.createGain();AU.master.gain.value=AU.muted?0:1;AU.master.connect(AU.ctx.destination);
-  for(const n of ['hit','slam','skill','shot','coin','heal','ok','boom','roll'])loadBuf('s_'+n,'snd/s_'+n+'.wav');if(AU.want){const w=AU.want;AU.cur=null;music(w)}}catch(e){AU.ctx=null}}
+  for(const n of ['hit','slam','skill','shot','coin','heal','ok','boom','roll','stairs','roar','whoosh','charge','magic','impact'])loadBuf('s_'+n,'snd/s_'+n+'.wav');if(AU.want){const w=AU.want;AU.cur=null;music(w)}}catch(e){AU.ctx=null}}
 function loadBuf(k,url){if(AU.buf[k]!==undefined)return AU.buf[k];AU.buf[k]=fetch(url).then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()}).then(ab=>new Promise((ok,ko)=>AU.ctx.decodeAudioData(ab,ok,ko))).then(b=>AU.buf[k]=b).catch(()=>AU.buf[k]=null);return AU.buf[k]}
 function sfx(n,v=.45){const b=AU.ctx&&AU.buf['s_'+n];if(!b||b.then)return;try{const s=AU.ctx.createBufferSource(),g=AU.ctx.createGain();s.buffer=b;g.gain.value=v;s.connect(g);g.connect(AU.master);s.start()}catch(e){}}
 async function music(n){AU.want=n;if(!AU.ctx||AU.cur===n)return;AU.cur=n;
@@ -909,7 +912,7 @@ function render(t){
   {const h=p0.h,fp=apTotal(h)-apUsed(h)+tpTotal(h)-tpUsed(h);if(fp>0&&Math.sin(t*3)>-.3)txt(c,'★ '+fp+' point'+(fp>1?'s':'')+' à répartir (Héros)',VW/2,(portrait?ty0+70:62+SAFE.t),'#ffd34a','9px "Alegreya Sans", sans-serif','center')}
   if(world.boss){const b=world.boss,by=(portrait?110:74)+SAFE.t*.5,bw=Math.min(200,VW-70);
     const bx=VW/2;
-    txt(c,b.def.n+(b.awake?' éveillé':'')+(b.phase>1?' — enragé':''),bx+12,by-6,'#efe6cf','11px "Pirata One", Georgia, serif','center');
+    txt(c,b.def.n+' · niv. '+mobLv(b)+(b.awake?' éveillé':'')+(b.phase>2?' — FUREUR':b.phase>1?' — enragé':''),bx+12,by-6,'#efe6cf','11px "Pirata One", Georgia, serif','center');
     px(c,'#241c16',bx-bw/2-2,by-2,bw+4,8);nine(c,IMG.frame,bx-bw/2-7,by-7,bw+14,18,8);bar(c,bx-bw/2,by+1,bw,4,b.hp/b.maxhp,b.phase>1?'#e0603c':'#b8402e');
     frame(c,b.def.face,0,0,38,38,bx-bw/2-18,by+12,{sc:.6})}
   if(G.run&&world.kind==='dungeon')txt(c,'Butin : '+(Object.entries(G.run.loot).map(([k,v])=>v+' '+RES[k].n.toLowerCase()).join(', ')||'—'),10+SAFE.l,(NET.online?42:30)+ty0,'#d8cfb4','8px "Alegreya Sans", sans-serif');
@@ -1073,7 +1076,7 @@ function keepPos(w){return w}
 function carryPos(p){const W=world;return{x:clamp(Math.round((p.x+p.fx*18)/8)*8,28,W.w-28),y:clamp(Math.round((p.y+p.fy*14)/8)*8,44,W.h-18)}}
 /* ---------- sac et équipement ---------- */
 let bagSel=null,bagMode='sac';
-function openBag(mode='sac'){bagMode=mode;bagSel=null;menuOpen=true;$('#bag').hidden=false;renderBag();K={}}
+function openBag(mode='sac'){bagMode=mode;bagSel=null;bagSlot=null;menuOpen=true;$('#bag').hidden=false;renderBag();K={}}
 function closeBag(){menuOpen=false;$('#bag').hidden=true;K={};KP={};refreshStats();if(G.paused&&!$('#ov').hidden)return;resize()}
 /* ---------- carte du monde ---------- */
 function openMap(){menuOpen=true;$('#mapS').hidden=false;mapMode=world.kind==='field'?'local':'world';drawMap()}
@@ -1204,54 +1207,82 @@ const ATTR={for:{n:'Force',s:'FOR',c:'#e0805a',d:'PV, défense, dégâts du Gard
 const CBASE={lame:{for:5,dex:9,mag:3,main:'dex'},gardien:{for:9,dex:4,mag:4,main:'for'},arcaniste:{for:3,dex:5,mag:9,main:'mag'}};
 const SKINS=[...new Set([...LOOKS,'NinjaYellow','NinjaDark','NinjaMasked','NinjaFire','NinjaWater','NinjaEskimo','SamuraiBlue','SamuraiRed','GladiatorBlue','RedGladiator','FighterRed','FighterWhite','SorcererBlack','SorcererOrange','Vampire','Shaman','Caveman','Cavegirl','Caveman2','Cavegirl2','LionBoy','Monkey','Woman','Villager','Villager2','Villager4','Master','Skeleton'])].filter(n=>AT['ch_'+n]&&AT['ch_'+n][3]>=112);
 /* ---------- talents : 3 branches de 4 talents par classe ; le palier n demande 3n points dans la branche ---------- */
+const TTIER=[0,1,1,2,3,3,4];
 const TAL={
  lame:[
   {n:'Lame vive',c:'#e0805a',t:[
    {id:'l1',n:'Tranchant',d:'Dégâts +4 % par rang',max:3,st:{atk:4}},
    {id:'l2',n:'Œil de faucon',d:'Critique +3 % par rang',max:3,st:{crit:3}},
+   {id:'l13',n:'Fil d\'acier',d:'Dégâts +3 % par rang',max:3,st:{atk:3}},
    {id:'l3',n:'Coup de grâce',d:'+15 % de dégâts par rang aux ennemis sous 35 % de PV',max:2,st:{exec:15}},
+   {id:'l14',n:'Saignée',d:'Critique +2 % et +5 % aux ennemis affaiblis par rang',max:2,st:{crit:2,exec:5}},
+   {id:'l15',n:'Danse des lames',d:'Dégâts +3 % et vitesse +2 % par rang',max:2,st:{atk:3,spd:2}},
    {id:'l4',n:'Frénésie',d:'Chaque critique réduit de 0,5 s la recharge des techniques',max:1,st:{frenzy:1}}]},
   {n:'Ombre',c:'#7ad08a',t:[
    {id:'l5',n:'Pieds légers',d:'Vitesse +3 % par rang',max:3,st:{spd:3}},
    {id:'l6',n:'Roulade fluide',d:'Roulade : −15 % d\'endurance par rang',max:3,st:{roll:15}},
+   {id:'l16',n:'Esquive',d:'Défense +2 % par rang',max:3,st:{def:2}},
    {id:'l7',n:'Souffle long',d:'Endurance +15 par rang',max:2,st:{st:15}},
+   {id:'l17',n:'Vent du nord',d:'Vitesse +2 % et endurance +10 par rang',max:2,st:{spd:2,st:10}},
+   {id:'l18',n:'Ombre tenace',d:'Régénère 0,4 PV par seconde par rang',max:2,st:{regen:.4}},
    {id:'l8',n:'Pas fantôme',d:'Après une roulade, le coup suivant fait +60 % de dégâts',max:1,st:{ghost:1}}]},
   {n:'Arts du kunaï',c:'#7ab0f0',t:[
    {id:'l9',n:'Technique affûtée',d:'Techniques +6 % par rang',max:3,st:{sk:6}},
    {id:'l10',n:'Concentration',d:'Recharge des techniques −5 % par rang',max:3,st:{cdr:5}},
+   {id:'l19',n:'Kunaï empoisonné',d:'Techniques +5 % par rang',max:3,st:{sk:5}},
    {id:'l11',n:'Soif de sang',d:'Vol de vie +1 % par rang',max:2,st:{ls:1}},
+   {id:'l20',n:'Rythme',d:'Recharge des techniques −4 % par rang',max:2,st:{cdr:4}},
+   {id:'l21',n:'Sang-froid',d:'Critique +2 % et vol de vie +0,5 % par rang',max:2,st:{crit:2,ls:.5}},
    {id:'l12',n:'Maître d\'armes',d:'Techniques +20 % et recharge −10 %',max:1,st:{sk:20,cdr:10}}]}],
  gardien:[
   {n:'Rempart',c:'#e0b05a',t:[
    {id:'g1',n:'Carrure',d:'PV +15 par rang',max:3,st:{hp:15}},
    {id:'g2',n:'Plaques renforcées',d:'Défense +3 % par rang',max:3,st:{def:3}},
+   {id:'g13',n:'Cuirasse',d:'PV +10 et défense +1 % par rang',max:3,st:{hp:10,def:1}},
    {id:'g3',n:'Épines',d:'Renvoie 15 % des dégâts reçus par rang',max:2,st:{thorn:15}},
+   {id:'g14',n:'Bastion',d:'Défense +3 % par rang',max:2,st:{def:3}},
+   {id:'g15',n:'Ronces de fer',d:'Renvoie 10 % des dégâts reçus par rang',max:2,st:{thorn:10}},
    {id:'g4',n:'Inébranlable',d:'Sous 30 % de PV, dégâts reçus −25 %',max:1,st:{unbreak:1}}]},
   {n:'Colosse',c:'#e0805a',t:[
    {id:'g5',n:'Bras de fer',d:'Dégâts +4 % par rang',max:3,st:{atk:4}},
    {id:'g6',n:'Coup précis',d:'Critique +2 % par rang',max:3,st:{crit:2}},
+   {id:'g16',n:'Poigne',d:'Dégâts +3 % par rang',max:3,st:{atk:3}},
    {id:'g7',n:'Onde de choc',d:'Techniques +8 % par rang',max:2,st:{sk:8}},
+   {id:'g17',n:'Frappe lourde',d:'Critique +2 % et techniques +4 % par rang',max:2,st:{crit:2,sk:4}},
+   {id:'g18',n:'Bourreau',d:'+12 % de dégâts aux ennemis sous 35 % de PV par rang',max:2,st:{exec:12}},
    {id:'g8',n:'Fléau des tyrans',d:'+25 % de dégâts aux élites et aux boss',max:1,st:{bossdmg:25}}]},
   {n:'Vœu',c:'#9fd4f0',t:[
    {id:'g9',n:'Vitalité',d:'Régénère 0,6 PV par seconde par rang',max:3,st:{regen:.6}},
    {id:'g10',n:'Volonté',d:'Résistance aux altérations +8 % par rang',max:3,st:{res:8}},
+   {id:'g19',n:'Sève',d:'PV +8 et 0,4 PV par seconde par rang',max:3,st:{hp:8,regen:.4}},
    {id:'g11',n:'Ferveur',d:'Vol de vie +1,5 % par rang',max:2,st:{ls:1.5}},
+   {id:'g20',n:'Foi',d:'Résistance aux altérations +6 % par rang',max:2,st:{res:6}},
+   {id:'g21',n:'Aura sacrée',d:'Vol de vie +1 % et défense +1 % par rang',max:2,st:{ls:1,def:1}},
    {id:'g12',n:'Second souffle',d:'Une fois par zone, survit à un coup fatal avec 30 % des PV',max:1,st:{secondw:1}}]}],
  arcaniste:[
   {n:'Feu',c:'#e0805a',t:[
    {id:'a1',n:'Braise',d:'Techniques +6 % par rang',max:3,st:{sk:6}},
    {id:'a2',n:'Étincelle',d:'Critique +3 % par rang',max:3,st:{crit:3}},
+   {id:'a13',n:'Flamme vive',d:'Techniques +5 % par rang',max:3,st:{sk:5}},
    {id:'a3',n:'Combustion',d:'+15 % de dégâts par rang aux ennemis sous 35 % de PV',max:2,st:{exec:15}},
+   {id:'a14',n:'Pyromanie',d:'Critique +2 % et dégâts +3 % par rang',max:2,st:{crit:2,atk:3}},
+   {id:'a15',n:'Brasier',d:'+8 % de dégâts aux élites et aux boss par rang',max:2,st:{bossdmg:8}},
    {id:'a4',n:'Ignition',d:'+25 % de dégâts aux élites et aux boss',max:1,st:{bossdmg:25}}]},
   {n:'Givre',c:'#9fd4f0',t:[
    {id:'a5',n:'Peau de givre',d:'Défense +2 % par rang',max:3,st:{def:2}},
    {id:'a6',n:'Esprit clair',d:'Résistance aux altérations +8 % par rang',max:3,st:{res:8}},
+   {id:'a16',n:'Manteau gelé',d:'PV +10 par rang',max:3,st:{hp:10}},
    {id:'a7',n:'Cœur de glace',d:'PV +20 par rang',max:2,st:{hp:20}},
+   {id:'a17',n:'Engelure',d:'Défense +2 % et résistance +5 % par rang',max:2,st:{def:2,res:5}},
+   {id:'a18',n:'Cristal vivant',d:'Régénère 0,4 PV par seconde par rang',max:2,st:{regen:.4}},
    {id:'a8',n:'Barrière de mana',d:'20 % des dégâts reçus sont pris sur l\'endurance',max:1,st:{mshield:1}}]},
   {n:'Éther',c:'#c07aff',t:[
    {id:'a9',n:'Réserve',d:'Endurance +12 par rang',max:3,st:{st:12}},
    {id:'a10',n:'Flux rapide',d:'Recharge des techniques −5 % par rang',max:3,st:{cdr:5}},
+   {id:'a19',n:'Flux',d:'Recharge des techniques −4 % par rang',max:3,st:{cdr:4}},
    {id:'a11',n:'Méditation',d:'Régénère 0,5 PV par seconde par rang',max:2,st:{regen:.5}},
+   {id:'a20',n:'Arcane pure',d:'Techniques +5 % par rang',max:2,st:{sk:5}},
+   {id:'a21',n:'Siphon',d:'Vol de vie +1 % par rang',max:2,st:{ls:1}},
    {id:'a12',n:'Courant arcanique',d:'Chaque attaque rend 4 points d\'endurance',max:1,st:{flux:1}}]}]};
 /* ---------- équipement : 8 emplacements, prérequis, pièces de classe, panoplies ---------- */
 const SLOTS=[['w','Arme'],['o','Main gauche'],['h','Tête'],['a','Torse'],['g','Mains'],['b','Pieds'],['j','Amulette'],['r','Anneau']];
@@ -1350,6 +1381,7 @@ const QUESTS=[
  {id:'q20',g:'garde',n:'Prime de chasse',d:'La garde paie pour chaque monstre abattu. Ramène quinze trophées, et reviens quand tu veux.',k:'kill',t:'any',c:15,rep:true,req:['q1'],rew:{or:80,xp:120}}];
 const QBYID=Object.fromEntries(QUESTS.map(q=>[q.id,q]));
 
+let talSel=null;
 /* ---------- héros : points, talents, statistiques ---------- */
 function apTotal(h){return 3*((h.lv||1)-1)+(h.apB||0)}
 function apUsed(h){const a=h.al||{};return (a.for||0)+(a.dex||0)+(a.mag||0)}
@@ -1364,7 +1396,8 @@ function allStats(h,i){
   for(const it of S.items)if(it.loc==='h'+i)add(itStats(it));
   const sc=setCounts(i);for(const k in sc){if(sc[k]>=2)add(SETS[k].b2);if(sc[k]>=4)add(SETS[k].b4)}
   add(talStats(h));
-  const b=baseAttr(h);o.attr={for:b.for+(o.for||0),dex:b.dex+(o.dex||0),mag:b.mag+(o.mag||0)};return o}
+  const b=baseAttr(h);o.attr={for:b.for+(o.for||0),dex:b.dex+(o.dex||0),mag:b.mag+(o.mag||0)};
+  for(const it of S.items)if(it.loc==='h'+i&&it.sc){const v=scaleBonus(it,o.attr);if(v)o.atk=(o.atk||0)+v}return o}
 function mkPlayer(i,ai){
   const h=S.heroes[i],c=CLS[h.cls],b=S.bld,g=allStats(h,i),A=g.attr,B=CBASE[h.cls],lv=h.lv||1;
   const dF=A.for-B.for,dD=A.dex-B.dex,dM=A.mag-B.mag,mainK=1+.02*(A[B.main]-B[B.main]);
@@ -1478,10 +1511,22 @@ function renderHeroes(){
       const al=$('#aLooks');for(const id of SKINS){const b=document.createElement('button');b.className='look';b.setAttribute('aria-pressed',h.look===id);b.appendChild(lookCanvas(id));b.onclick=()=>{h.look=id;save();renderHeroes()};al.appendChild(b)}}
   }
   if(heroTab==='tal'){
-    T.innerHTML=`<p class="note">${tfree} point${tfree>1?'s':''} de talent à dépenser (1 par niveau, plus les récompenses de quêtes). Chaque palier demande 3 points de plus dans sa branche.</p>
-      <div class="tals">${TAL[h.cls].map((br,b)=>{const bp=branchPts(h,b);return `<div class="tbr"><b style="color:${br.c}">${br.n} · ${bp}</b>${br.t.map((t,k)=>{const r=h.tal[t.id]||0,need=3*k,ok=bp>=need&&r<t.max&&tfree>0;return `<button class="tal${r?' on':''}${bp<need?' lock':''}" data-t="${t.id}" data-b="${b}" data-k="${k}" ${ok?'':'aria-disabled="true"'}><b>${t.n} <small>${r}/${t.max}</small></b><small>${bp<need?'Requiert '+need+' points dans la branche':t.d}</small></button>`}).join('')}</div>`}).join('')}</div>
+    const C=180,ANG=[-90,30,150],need=k=>3*TTIER[k],sel=talSel&&TAL[h.cls].some(br=>br.t.some(t=>t.id===talSel))?talSel:null;
+    const pos=(b,k)=>{const a=ANG[b]*Math.PI/180,tr=TTIER[k],r=48+29*tr,pair=TTIER.filter(x=>x===tr).length>1,side=pair?(TTIER.indexOf(tr)===k?-1:1):0,o=side*24;return[C+Math.cos(a)*r-Math.sin(a)*o,C+Math.sin(a)*r+Math.cos(a)*o]};
+    let g='';const ring=[0,1,2,3,4].map(t=>`<circle cx="${C}" cy="${C}" r="${48+29*t}" fill="none" stroke="#ffffff10" stroke-dasharray="3 5"/>`).join('');
+    TAL[h.cls].forEach((br,b)=>{const bp=branchPts(h,b);br.t.forEach((t,k)=>{const [x,y]=pos(b,k),par=TTIER[k]===0?[[C,C]]:br.t.map((_,q)=>q).filter(q=>TTIER[q]===TTIER[k]-1).map(q=>pos(b,q)),on=(h.tal[t.id]||0)>0,lit=bp>=need(k);
+      par.forEach(([px,py])=>g=`<line x1="${px}" y1="${py}" x2="${x}" y2="${y}" stroke="${lit?br.c:'#4a4438'}" stroke-width="${on?3:2}" opacity="${lit?.9:.6}"/>`+g)})});
+    TAL[h.cls].forEach((br,b)=>{const bp=branchPts(h,b),a=ANG[b]*Math.PI/180;g+=`<text x="${C+Math.cos(a)*190}" y="${C+Math.sin(a)*190+(ANG[b]<0?-2:12)}" text-anchor="middle" fill="${br.c}" font-size="12" font-weight="700">${br.n} · ${bp}</text>`;
+      br.t.forEach((t,k)=>{const [x,y]=pos(b,k),r=h.tal[t.id]||0,lit=bp>=need(k),cap=k===6,R=cap?17:13;
+        g+=`<g class="tn" data-b="${b}" data-k="${k}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${R+5}" fill="transparent"/>${sel===t.id?`<circle cx="${x}" cy="${y}" r="${R+5}" fill="none" stroke="#fff" stroke-width="2"/>`:''}<circle cx="${x}" cy="${y}" r="${R}" fill="${r?br.c:lit?'#2a2620':'#1a1814'}" stroke="${lit?br.c:'#4a4438'}" stroke-width="${cap?3:2}"/>${r>=t.max?`<circle cx="${x}" cy="${y}" r="${R-4}" fill="none" stroke="#fff8" stroke-width="1.5"/>`:''}<text x="${x}" y="${y+4}" text-anchor="middle" font-size="${cap?12:10}" font-weight="700" fill="${r?'#1a120a':lit?'#e8dcc0':'#6a6458'}">${lit?r+'/'+t.max:'🔒'}</text></g>`})});
+    const cl=CLS[h.cls];g+=`<circle cx="${C}" cy="${C}" r="30" fill="#1a1612" stroke="#d9a441" stroke-width="2"/><text x="${C}" y="${C-3}" text-anchor="middle" font-size="18" font-weight="800" fill="${tfree>0?'#ffd34a':'#d9a441'}">${tfree}</text><text x="${C}" y="${C+12}" text-anchor="middle" font-size="9" fill="#bfb39a">point${tfree>1?'s':''}</text>`;
+    let info='<p class="note" style="text-align:center">Touchez un nœud pour voir le talent. Les branches partent du cœur : chaque anneau demande 3 points de plus dans sa branche.</p>';
+    if(sel){TAL[h.cls].forEach((br,b)=>br.t.forEach((t,k)=>{if(t.id!==sel)return;const r=h.tal[t.id]||0,bp=branchPts(h,b),ok=bp>=need(k)&&r<t.max&&tfree>0;
+      info=`<div class="detail"><b style="color:${br.c};font-size:16px">${t.n}</b> <small style="color:var(--muted)">${br.n} · anneau ${TTIER[k]+1}${k===6?' · talent ultime':''} · rang ${r}/${t.max}</small><div class="skl">${t.d}</div>${bp<need(k)?`<div class="skl no">Requiert ${need(k)} points dans ${br.n} (vous en avez ${bp})</div>`:''}<div class="row" style="justify-content:flex-start"><button class="btn sm" id="tLearn" data-b="${b}" data-k="${k}" ${ok?'':'disabled'}>${r>=t.max?'Maîtrisé':'Apprendre'}</button></div></div>`}))}
+    T.innerHTML=`<p class="note">${tfree} point${tfree>1?'s':''} de talent à dépenser (1 par niveau, plus les récompenses de quêtes).</p><svg class="ttree" viewBox="-22 -22 404 404">${ring}${g}</svg>${info}
       ${tpUsed(h)?`<div class="row"><button class="btn ghost sm" id="tRes">Réinitialiser les talents (${resetCost(h)} or)</button></div>`:''}`;
-    T.querySelectorAll('.tal').forEach(b=>b.onclick=()=>{const t=TAL[h.cls][+b.dataset.b].t[+b.dataset.k],r=h.tal[t.id]||0;if(tpTotal(h)-tpUsed(h)<=0||r>=t.max||branchPts(h,+b.dataset.b)<3*(+b.dataset.k))return;h.tal[t.id]=r+1;save();refreshStats();sfx('ok',.4);renderHeroes()});
+    T.querySelectorAll('.tn').forEach(n=>n.onclick=()=>{talSel=TAL[h.cls][+n.dataset.b].t[+n.dataset.k].id;sfx('ok',.15);renderHeroes()});
+    const L=$('#tLearn');if(L)L.onclick=()=>{const b=+L.dataset.b,k=+L.dataset.k,t=TAL[h.cls][b].t[k],r=h.tal[t.id]||0;if(tpTotal(h)-tpUsed(h)<=0||r>=t.max||branchPts(h,b)<need(k))return;h.tal[t.id]=r+1;save();refreshStats();sfx('ok',.4);renderHeroes()};
     const tr=$('#tRes');if(tr)tr.onclick=()=>{if(!adm&&!pay({or:resetCost(h)}))return;h.tal={};save();refreshStats();renderHeroes()};
   }
   if(heroTab==='tech'){
@@ -1497,6 +1542,9 @@ function renderPreviews(t){prev.forEach(({cv,h})=>{if(!cv)return;const c=cv.getC
 
 /* ---------- objets ---------- */
 function reqVal(t,rar){return 3+3*t+2*rar}
+const ITLV=[1,1,4,7,10,13,16,19];function itemLv(it){return it.lv||ITLV[it.tier]||1}
+const GRADE={S:.9,A:.7,B:.5,C:.35,D:.2,E:.1};
+const BASEK={w:['atk'],o:['crit','def','hp','sk'],h:['hp','def'],a:['hp','def'],g:['atk','crit'],b:['spd','st'],j:['res'],r:['for','dex','mag']};
 function genItem(tier,boost=0,min=0,o={}){
   const forCls=G&&G.players&&G.players[0]?G.players[0].h.cls:null;
   const slot=o.slot||SLOTS[Math.random()*SLOTS.length|0][0],rar=o.rar!=null?o.rar:rollRar(boost,min);
@@ -1514,6 +1562,8 @@ function genItem(tier,boost=0,min=0,o={}){
   if(slot==='b'){it.st.spd=r1((2+t)*m);it.st.st=Math.round((4+3*t)*m)}
   if(slot==='j')it.st.res=Math.round((3+2*t)*m);
   if(slot==='r'){const k=['for','dex','mag'][Math.random()*3|0];it.st[k]=Math.round((1+t)*m)}
+  it.lv=ITLV[t]||1;
+  if(slot==='w'||slot==='o'){const sc={};if(B.rq)sc[B.rq]=['C','B','A','S'][rar];const oth=['for','dex','mag'].filter(k=>k!==B.rq);if(!B.rq||Math.random()<.6)sc[oth[Math.random()*oth.length|0]]=['E','D','D','C'][rar];it.sc=sc}
   const pool2=AFXPOOL.filter(k=>!(k in it.st));let n=rar+(slot==='j'||slot==='r'?1:0)+(B.cls?1:0);
   while(n-->0&&pool2.length){const k=pool2.splice(Math.random()*pool2.length|0,1)[0],A=AFX[k],v=rnd(A[2],A[3])*(1+.25*(t-1));it.st[k]=A[3]>=4?Math.round(v):r1(v)}
   if(rar>=2&&Math.random()<.4){const ks=Object.keys(SETS).filter(k=>SETS[k].slots.includes(slot));if(ks.length)it.set=ks[Math.random()*ks.length|0]}
@@ -1521,6 +1571,7 @@ function genItem(tier,boost=0,min=0,o={}){
   return it;
 }
 function canEquip(h,it){
+  if(itemLv(it)>(h.lv||1))return{ok:false,why:'Niveau '+itemLv(it)+' requis'};
   if(it.cls&&it.cls!==h.cls)return{ok:false,why:'Réservé : '+CLS[it.cls].n};
   const A=baseAttr(h);for(const k in it.req||{})if(A[k]<it.req[k])return{ok:false,why:'Requiert '+ATTR[k].n+' '+it.req[k]+' (vous : '+A[k]+')'};
   return{ok:true}}
@@ -1528,7 +1579,11 @@ function gearStats(i){const o=allStats(S.heroes[i],i);delete o.attr;return o}
 function fmtStat(k,v){const A=AFX[k];if(!A)return'';return k==='cdr'?A[0]+' −'+v+A[1]:A[0]+' +'+v+A[1]}
 function statLines(it){const s=itStats(it);return Object.entries(s).map(([k,v])=>fmtStat(k,v))}
 function upCost(it){const n=it.up+1,t=it.tier;const o={or:22*n*t,fer:Math.max(1,Math.round(2*n*t))};if(it.up>=4)o.cristal=(it.up-3)*4*t;return o}
-function recycleGain(it){const t=it.tier,r=it.rar;const o={or:10*t*(r+1),fer:2*t*(r+1)};if(r>=2)o.cristal=5*r*t;return o}
+function recycleGain(it){const t=it.tier,r=it.rar;const o={or:Math.round((12+6*it.up)*t*(r+1)*(1+.25*S.bld.marche)),fer:2*t*(r+1)};if(r>=2)o.cristal=5*r*t;return o}
+function reforgeCost(it){return{or:30*it.tier*(it.rar+1),cristal:2*it.tier+it.rar}}
+function reforge(it){const base=BASEK[it.slot]||[],ks=Object.keys(it.st).filter(k=>!base.includes(k));const pool=AFXPOOL.filter(k=>!(k in it.st));
+  const r1=v=>Math.round(v*10)/10;if(ks.length){delete it.st[ks[Math.random()*ks.length|0]]}const k=pool[Math.random()*pool.length|0],A=AFX[k],v=rnd(A[2],A[3])*(1+.25*(it.tier-1))*(1+.15*it.rar);it.st[k]=A[3]>=4?Math.round(v):r1(v);return k}
+function scaleBonus(it,A){let b=0;for(const k in it.sc||{})b+=A[k]*GRADE[it.sc[k]];return Math.round(b*10)/10}
 function dropLoot(x,y,boost=0,min=0){G.loot.push({x:x+rnd(-6,6),y:y+rnd(-4,4),it:genItem(world.tier||1,boost,min),t:0})}
 /* icônes dessinées pour les pièces sans image */
 function drawGear(c,k,s,col){const P=(x,y,w,h,cc)=>px(c,cc,x*s,y*s,w*s,h*s),o='#2a1e1a',l='rgba(255,255,255,.35)';
@@ -1564,32 +1619,48 @@ function itemIcon(it,size=32){const o=cnv(size,size),c=o.getContext('2d');c.imag
 /* ---------- sac et équipement ---------- */
 function card(it,act){const h=curHero(),ce=canEquip(h,it),d=document.createElement('button');d.className='card'+(bagSel===it.uid?' sel':'')+(ce.ok?'':' bad');d.appendChild(itemIcon(it,32));
   const t=document.createElement('span');t.className='ct';t.innerHTML=`<b style="color:${it.set?SETS[it.set].c:RAR[it.rar].c}">${esc(it.n)}${it.up?' +'+it.up:''}</b><small>${SLOTN[it.slot]} · niv. ${it.tier}${ce.ok?'':' · '+(it.cls&&it.cls!==h.cls?CLS[it.cls].n:'prérequis')}</small>`;d.appendChild(t);d.onclick=act||(()=>{bagSel=it.uid;renderBag()});return d}
+let bagSlot=null;
+function cmpItem(it,cur){const a=itStats(it),b=cur?itStats(cur):{},keys=[...new Set([...Object.keys(a),...Object.keys(b)])];let up=0,dn=0;
+  const lines=keys.map(k=>{const va=a[k]||0,vb=b[k]||0,d=Math.round((va-vb)*10)/10;if(d>0)up++;if(d<0)dn++;
+    return {k,va,d,txt:(va?fmtStat(k,va):'<s>'+fmtStat(k,vb)+'</s>')+(cur&&d?` <b class="${d>0?'up':'dn'}">${d>0?'▲ +':'▼ '}${d}</b>`:'')}});return{lines,up,dn}}
+function card2(it,cur){const d=card(it,()=>{bagSel=it.uid;renderBag()});if(cur!==undefined&&!it.loc.startsWith('h')){const c=cmpItem(it,cur),t=d.querySelector('.ct small');t.insertAdjacentHTML('beforeend',` · <b class="up">▲${c.up}</b> <b class="dn">▼${c.dn}</b>`)}return d}
 function renderBag(){
-  const el=$('#bagIn');el.innerHTML='';const i=S.cur,h=curHero(),p=G.players[0];
+  const el=$('#bagIn');el.innerHTML='';const i=S.cur,h=curHero(),p=G.players[0],A=allStats(h,i).attr;
   const hd=document.createElement('div');hd.className='head';hd.innerHTML=`<h2>${bagMode==='coffre'?'Coffre du domaine':'Sac et équipement'}</h2><button class="btn sm" id="bagClose">Reprendre</button>`;el.appendChild(hd);$('#bagClose').onclick=closeBag;
-  const box=document.createElement('div');box.className='eqbox';const A=allStats(h,i).attr;
-  box.innerHTML=`<span class="lbl">${esc(h.name)} · ${CLS[h.cls].n} niv. ${h.lv} · Force ${A.for} · Dextérité ${A.dex} · Mana ${A.mag}</span>`;
+  const box=document.createElement('div');box.className='eqbox';
+  box.innerHTML=`<span class="lbl">${esc(h.name)} · ${CLS[h.cls].n} niv. ${h.lv} · Force ${A.for} · Dextérité ${A.dex} · Mana ${A.mag}</span><span class="note" style="font-size:12px">Touchez un emplacement pour voir les objets qui peuvent y aller.</span>`;
   const row=document.createElement('div');row.className='slots8';
-  for(const [s,sn] of SLOTS){const it=S.items.find(x=>x.loc==='h'+i&&x.slot===s);if(it)row.appendChild(card(it));else{const e=document.createElement('div');e.className='card empty';e.textContent=sn;row.appendChild(e)}}
+  for(const [s_,sn] of SLOTS){const it=S.items.find(x=>x.loc==='h'+i&&x.slot===s_);let e;
+    if(it){e=card(it,()=>{bagSel=it.uid;bagSlot=s_;renderBag()})}else{e=document.createElement('button');e.className='card empty';e.textContent=sn+' : vide';e.onclick=()=>{bagSlot=s_;bagSel=null;renderBag()}}
+    if(bagSlot===s_)e.classList.add('slotsel');row.appendChild(e)}
   box.appendChild(row);const sm=document.createElement('div');sm.innerHTML=statSummary(p);box.appendChild(sm);el.appendChild(box);
+  if(bagSlot){const cur=S.items.find(x=>x.loc==='h'+i&&x.slot===bagSlot),cands=S.items.filter(x=>x.slot===bagSlot&&(x.loc==='sac'||x.loc==='coffre'&&bagMode==='coffre'));
+    const sc=it=>{const c=cmpItem(it,cur);return (canEquip(h,it).ok?1000:0)+c.up*10-c.dn*10+it.rar};cands.sort((a,b)=>sc(b)-sc(a));
+    const t=document.createElement('span');t.className='lbl';t.textContent=`Pour l'emplacement ${SLOTN[bagSlot]} · ${cands.length} objet${cands.length>1?'s':''}`;el.appendChild(t);
+    const g=document.createElement('div');g.className='grid';cands.forEach(it=>g.appendChild(card2(it,cur||null)));if(!cands.length)g.innerHTML='<p class="note">Aucun objet de ce type dans le sac.</p>';el.appendChild(g)}
   const sel=S.items.find(x=>x.uid===bagSel);
   if(sel){const d=document.createElement('div');d.className='detail';const where=sel.loc,cost=upCost(sel),needF=Math.ceil((sel.up+1)/2),ce=canEquip(h,sel);
-    const req=Object.entries(sel.req||{}).map(([k,v])=>`<span class="${baseAttr(h)[k]<v?'no':''}">Requiert ${ATTR[k].n} ${v}</span>`).join(' · ');
+    const cur=where.startsWith('h')?null:S.items.find(x=>x.loc==='h'+i&&x.slot===sel.slot);const cmp=cmpItem(sel,cur);
+    const reqs=[`<span class="${itemLv(sel)>h.lv?'no':''}">Niveau ${itemLv(sel)}</span>`].concat(Object.entries(sel.req||{}).map(([k,v])=>`<span class="${baseAttr(h)[k]<v?'no':''}">${ATTR[k].n} ${v}</span>`)).join(' · ');
+    const scl=sel.sc&&Object.keys(sel.sc).length?`<div class="skl">Échelle : ${Object.entries(sel.sc).map(([k,g])=>`${ATTR[k].n} <b class="grade g${g}">${g}</b>`).join(' · ')} → dégâts +${scaleBonus(sel,A)} % avec vos caractéristiques</div>`:'';
     const setInfo=sel.set?(()=>{const S_=SETS[sel.set],n=setCounts(i)[sel.set]||0,fmt=o=>Object.entries(o).map(([k,v])=>fmtStat(k,v)).join(', ');
       return `<div class="skl" style="color:${S_.c}">Panoplie ${S_.n} (${n}/4 portées) · ${S_.slots.map(s=>SLOTN[s]).join(', ')}<br><span style="opacity:${n>=2?1:.55}">2 pièces : ${fmt(S_.b2)}</span><br><span style="opacity:${n>=4?1:.55}">4 pièces : ${fmt(S_.b4)}</span></div>`})():'';
-    d.innerHTML=`<div class="dh" style="display:flex;gap:10px;align-items:center"></div><div class="skl">${statLines(sel).join('<br>')}</div>${req||sel.cls?`<div class="skl">${sel.cls?`<span class="${sel.cls!==h.cls?'no':''}">Réservé : ${CLS[sel.cls].n}</span>${req?' · ':''}`:''}${req}</div>`:''}${setInfo}<div class="row" style="justify-content:flex-start" id="acts"></div>`;
-    const dh=d.querySelector('.dh');dh.appendChild(itemIcon(sel,40));const nm=document.createElement('div');nm.innerHTML=`<b style="color:${sel.set?SETS[sel.set].c:RAR[sel.rar].c};font-size:17px">${esc(sel.n)}${sel.up?' +'+sel.up:''}</b><br><small style="color:var(--muted)">${RAR[sel.rar].n} · ${SLOTN[sel.slot]} · niveau ${sel.tier}</small>`;dh.appendChild(nm);
+    d.innerHTML=`<div class="dh" style="display:flex;gap:10px;align-items:center"></div>${cur?`<div class="note" style="font-size:12px">Comparé à : ${esc(cur.n)}${cur.up?' +'+cur.up:''}</div>`:''}<div class="skl cmp">${cmp.lines.map(l=>l.txt).join('<br>')}</div><div class="skl">Requis : ${reqs}${sel.cls?` · <span class="${sel.cls!==h.cls?'no':''}">Réservé : ${CLS[sel.cls].n}</span>`:''}</div>${scl}${setInfo}<div class="row" style="justify-content:flex-start" id="acts"></div>`;
+    const dh=d.querySelector('.dh');dh.appendChild(itemIcon(sel,40));const nm=document.createElement('div');nm.innerHTML=`<b style="color:${sel.set?SETS[sel.set].c:RAR[sel.rar].c};font-size:17px">${esc(sel.n)}${sel.up?' +'+sel.up:''}</b><br><small style="color:var(--muted)">${RAR[sel.rar].n} · ${SLOTN[sel.slot]} · palier ${sel.tier}</small>`;dh.appendChild(nm);
     el.appendChild(d);const Ac=d.querySelector('#acts');
     const btn=(txt,fn,ok=true,cls='btn sm')=>{const b=document.createElement('button');b.className=cls;b.innerHTML=txt;b.disabled=!ok;b.onclick=()=>{fn();save();refreshStats();renderBag()};Ac.appendChild(b)};
+    const ct=o=>Object.entries(o).map(([r,v])=>v+' '+RES[r].n.toLowerCase()).join(', ');
     if(where.startsWith('h'))btn('Retirer',()=>{if(sacN()<SACMAX)sel.loc='sac'},sacN()<SACMAX,'btn ghost sm');
-    else{btn(ce.ok?'Équiper':'Équiper <small>('+ce.why+')</small>',()=>{const cur=S.items.find(x=>x.loc==='h'+i&&x.slot===sel.slot);if(cur)cur.loc=where;sel.loc='h'+i;sfx('ok',.3)},ce.ok);
+    else{btn(ce.ok?'Équiper':'Équiper <small>('+ce.why+')</small>',()=>{const c=S.items.find(x=>x.loc==='h'+i&&x.slot===sel.slot);if(c)c.loc=where;sel.loc='h'+i;sfx('ok',.3)},ce.ok);
       if(bagMode==='coffre'){if(where==='sac')btn('Mettre au coffre',()=>{sel.loc='coffre'},S.items.filter(x=>x.loc==='coffre').length<stashCap(),'btn ghost sm');else btn('Prendre',()=>{sel.loc='sac'},sacN()<SACMAX,'btn ghost sm')}}
-    if(sel.up<10)btn(`Améliorer +${sel.up+1} <small>(${Object.entries(cost).map(([r,v])=>v+' '+RES[r].n.toLowerCase()).join(', ')}${S.bld.forge<needF?' · forge niv. '+needF:''})</small>`,()=>{if(S.bld.forge>=needF&&pay(cost)){sel.up++;sfx('ok',.5)}},S.bld.forge>=needF&&canPay(cost));
-    if(!where.startsWith('h'))btn('Recycler',()=>{const g=recycleGain(sel);for(const k in g)S.res[k]+=g[k];renderRes();S.items=S.items.filter(x=>x!==sel);bagSel=null;sfx('coin',.4)},true,'btn ghost sm')}
+    if(sel.up<10)btn(`Améliorer +${sel.up+1} <small>(${ct(cost)}${S.bld.forge<needF?' · forge niv. '+needF:''})</small>`,()=>{if(S.bld.forge>=needF&&pay(cost)){sel.up++;sfx('ok',.5)}},S.bld.forge>=needF&&canPay(cost));
+    const rc=reforgeCost(sel);btn(`Reforger un bonus <small>(${ct(rc)}${S.bld.forge<1?' · forge niv. 1':''})</small>`,()=>{if(S.bld.forge>=1&&pay(rc)){const k=reforge(sel);sfx('magic',.4);banner('Nouveau bonus : '+AFX[k][0])}},S.bld.forge>=1&&canPay(rc),'btn ghost sm');
+    if(!where.startsWith('h')){const g=recycleGain(sel);btn(`Recycler <small>(+${ct(g)})</small>`,()=>{for(const k in g)S.res[k]+=g[k];renderRes();S.items=S.items.filter(x=>x!==sel);bagSel=null;sfx('coin',.5)},true,'btn ghost sm')}}
   const lists=bagMode==='coffre'?[['sac','Sac',SACMAX],['coffre','Coffre',stashCap()]]:[['sac','Sac',SACMAX]];
   for(const [loc,name,cap] of lists){const its=S.items.filter(x=>x.loc===loc).sort((a,b)=>b.rar-a.rar||b.tier-a.tier);
     const t=document.createElement('span');t.className='lbl';t.textContent=`${name} · ${its.length}/${cap}`;el.appendChild(t);
-    const g=document.createElement('div');g.className='grid';its.forEach(it=>g.appendChild(card(it)));if(!its.length){g.innerHTML='<p class="note">Vide. Les monstres, coffres, boss et quêtes donnent des objets.</p>'}el.appendChild(g)}
+    const g=document.createElement('div');g.className='grid';its.forEach(it=>g.appendChild(card2(it,S.items.find(x=>x.loc==='h'+i&&x.slot===it.slot)||null)));if(!its.length){g.innerHTML='<p class="note">Vide. Les monstres, coffres, boss et quêtes donnent des objets.</p>'}el.appendChild(g)}
+  if(sel&&!bagSlot)setTimeout(()=>{const dd=el.querySelector('.detail');if(dd)dd.scrollIntoView({block:'nearest'})},0);
 }
 
 /* ---------- grandes régions : routes, lacs, forêts, camp, ruines, récolte, meutes ---------- */
@@ -1800,7 +1871,7 @@ function killMob(e){
   if(netMulti()&&NET.host)NET.out.push({k:'kill',n:e.nid,x:e.x|0,y:e.y|0,t:e.type,lv:Math.round(e.lv*100)/100,el:e.elite?1:0});
   killReward(e);
   if(world.kind==='dungeon'&&!world.boss&&!foes().length){if(world.waves>0){nextWave();return}
-    world.door=true;world.solids=world.solids.filter(s=>!s.door);world.trig.push({kind:'door',x:world.w/2,y:20,r:18,auto:true});banner('La porte s\'ouvre')}
+    world.door=true;world.solids=world.solids.filter(s=>!s.door);world.trig.push({kind:'door',x:world.w/2,y:20,r:18,auto:true});banner('La porte s\'ouvre');sfx('ok',.5)}
 }
 function killReward(e){
   if(e.elite){addFx('fx_expl',e.x,e.y-8,9,40,40,.5);G.shake=Math.max(G.shake,.15)}
@@ -2052,6 +2123,30 @@ function drawMountBack(c,k,x,y,f){const [b,t,o]=MBACK[k]||MBACK.horse,P=(px_,py,
   const sw=f?1:0;P(7+sw,6,2,7,t);P(7+sw,13,2,2,t);P(6+sw,14,1,1,o);P(9+sw,14,1,1,o);
   P(3,12+(f?0:1),2,3,o);P(11,12+(f?1:0),2,3,o)}
 
+/* ---------- v14 : niveaux des monstres, sons, intensité ---------- */
+const BOSSLV={golem:5,liche:8,wyrm:10,frog:12,samurai:16,squid:20};
+function mobLv(e){if(e.isBoss)return (BOSSLV[e.def&&e.def.id]||5)+(e.awake?3:0);return Math.max(1,Math.round(((e.lv||1)-1)/.13+1))+(e.elite?2:0)}
+function lvCol(l){const d=l-((curHero()||{}).lv||1);return d>=3?'#ff5a4a':d>=1?'#ffd34a':'#8fe07a'}
+{const _dm=drawMob;drawMob=function(c,e,t){_dm(c,e,t);if(e.hp<=0)return;const M=MOBS[e.type]||{sc:1},l=mobLv(e),x=Math.round(e.x)+9,y=Math.round(e.y-16*(M.sc||1)-2);
+  c.font='bold 8px sans-serif';c.textAlign='left';c.lineWidth=2.5;c.strokeStyle='rgba(0,0,0,.85)';c.strokeText(l,x,y);c.fillStyle=lvCol(l);c.fillText(l,x,y)}}
+const SNDT={};function sfxT(n,v,gap){const t=performance.now();if(SNDT[n]&&t-SNDT[n]<gap*1000)return;SNDT[n]=t;sfx(n,v)}
+const BSND={slam:'whoosh',combo:'whoosh',sweep:'whoosh',charge:'charge',nova:'magic',ring:'magic',rocks:'impact',adds:'roar',spiral:'magic',frost:'magic',blink:'magic',lightning:'magic',poison:'magic'};
+{const _ba=bossAttack;bossAttack=function(b,tgt){_ba(b,tgt);sfxT(BSND[b.last]||'whoosh',.5,.2);if(b.phase>2)b.t*=.7}}
+{const _ub=updBoss;updBoss=function(b,dt){if(b.phase===2&&b.hp>0&&b.hp<b.maxhp*.25){b.phase=3}_ub(b,dt);if(b.phase>2&&b.state==='walk'&&!b.dash&&!(b.stunT>0)){const al=G.players.filter(p=>!p.down);if(al.length){const q=al.reduce((a,p)=>dist(p.x,p.y,b.x,b.y)<dist(a.x,a.y,b.x,b.y)?p:a),d=dist(q.x,q.y,b.x,b.y);if(d>b.r+18)move(b,(q.x-b.x)/d*b.def.spd*.4*dt,(q.y-b.y)/d*b.def.spd*.4*dt,b.r*.6)}}}}
+function intensity(dt){
+  const b=world.boss;
+  if(b&&b.hp>0){if(b._ph==null){b._ph=b.phase;b._intro=.7}
+    if(b._intro>0&&(b._intro-=dt)<=0){sfx('roar',.7);G.shake=Math.max(G.shake||0,.35);banner(b.def.n+(b.awake?' éveillé':'')+' · niv. '+mobLv(b))}
+    if(b.phase!==b._ph){b._ph=b.phase;sfx('roar',.8);G.shake=.6;b.flash=.5;G.rageFlash=.6;
+      if(b.phase===3){float(b.x,b.y-70,'FUREUR !','#ff5a3a');banner('Le boss entre en fureur !')}else if(b.phase===2)banner('Le boss entre en rage !')}}
+  for(const h of G.hz){if(h._snd==null){h._snd=1;const bo=h.owner&&h.owner.isBoss;if(!bo)sfxT('whoosh',.18,.4)}
+    if(h.fired&&!h._imp){h._imp=1;if(h.owner&&h.owner.isBoss&&h.type==='circle'&&h.dmg)sfxT('impact',.45,.12)}}
+  if(G.rageFlash>0)G.rageFlash-=dt;
+}
+{const _u=updV12;updV12=function(dt){_u(dt);try{intensity(dt)}catch(e){}}}
+{const _dl=drawLighting;drawLighting=function(...a){_dl(...a);if(G.rageFlash>0){const c=a[0]||window.ctx;if(c&&c.fillRect){c.save();c.setTransform(1,0,0,1,0,0);c.globalAlpha=Math.min(.35,G.rageFlash*.6);c.fillStyle='#c0201a';c.fillRect(0,0,c.canvas.width,c.canvas.height);c.restore()}}}}
+{const _go=go;go=function(kind,arg){if(kind==='dungeon'&&arg&&arg.idx>0)sfx('stairs',.6);else if(kind==='dungeon')sfx('stairs',.45);_go(kind,arg)}}
+
 migrate12(S);
 /* ===== Interface ===== */
 function renderRes(){
@@ -2085,7 +2180,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='13.4';
+const VERSION='14.0';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
