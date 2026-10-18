@@ -850,7 +850,7 @@ function openBld(k){
   if(l>=D.max)body='<p>Niveau maximum atteint.</p>';
   else if(l>=cap)body=`<p>Améliorez l'hôtel de ville pour dépasser le niveau ${cap}.</p>`;
   else body=`<p>Prochain niveau : ${D.fx(l+1)}</p><div class="cost">${Object.entries(o).map(([r,v])=>`<span class="${S.res[r]<v?'no':''}">${v} ${RES[r].n.toLowerCase()}</span>`).join('')}</div>`;
-  const unlock=k==='hall'&&l<D.max?Object.values(DUNGEONS).filter(d=>d.need===l+1).map(d=>`<p style="color:var(--gold)">Ouvre le donjon : ${d.n}</p>`).join(''):'';
+  const unlock=false&&l<D.max?Object.values(DUNGEONS).filter(d=>d.need===l+1).map(d=>`<p style="color:var(--gold)">Ouvre le donjon : ${d.n}</p>`).join(''):'';
   $('#ovp').innerHTML=`<h2>${D.n}</h2><p style="color:var(--muted)">Niveau ${l} / ${D.max}${l?' · '+D.fx(l):''}</p><p>${D.d}</p>${body}${unlock}
     <div class="row">${l<cap?`<button class="btn" id="up" ${canPay(o)?'':'disabled'}>${l?'Améliorer':'Construire'}</button>`:''}<button class="btn ghost" id="cl">Fermer</button></div>`;
   $('#cl').onclick=closeOv;
@@ -1412,7 +1412,7 @@ const QBYID=Object.fromEntries(QUESTS.map(q=>[q.id,q]));
 
 /* ---------- nouveaux PNJ (intérieurs) ---------- */
 Object.assign(NPCS,{
- intendant:{n:'Intendant Corbin',look:'Inspector',zone:'in:hall:0',hi:'La cité grandit avec ses héros. Chaque sceau royal compte.',lines:['Les sceaux royaux ne se trouvent pas sous les cailloux : seuls les hauts faits les méritent.','Le conseil n\'agrandit la cité que pour les aventuriers qui ont fait leurs preuves.','Parlez-moi pour agrandir l\'hôtel de ville.']},
+ intendant:{n:'Intendant Corbin',look:'Inspector',zone:'in:hall:0',hi:'La cité grandit avec ses héros. Chaque sceau royal compte.',lines:['Les sceaux royaux ne se trouvent pas sous les cailloux : seuls les hauts faits les méritent.','Plus les boss sont lointains, plus leurs sceaux sont nombreux.','Parlez-moi pour agrandir l\'hôtel de ville.']},
  elise:{n:'Élise l\'archiviste',look:'OldWoman',zone:'in:hall:1',hi:'Chut… les livres dorment.',lines:['Les chroniques parlent d\'une couronne forgée dans le feu d\'une étoile.','Le roi Aldric lisait ici chaque soir, avant l\'incendie.','Il manque des pages à l\'histoire du royaume. Peut-être les écrirez-vous.']},
  apprenti:{n:'Tom l\'apprenti',look:'Boy',zone:'in:forge:0',hi:'Maëlle dit que je tape trop fort sur l\'enclume.',lines:['Un jour, je forgerai une épée légendaire !','Le fer de la forêt est plus pur que celui de la plaine.']},
  kenji:{n:'Maître Kenji',look:'Monk2',zone:'in:caserne:0',hi:'L\'esquive est un art. Le spam est une faute.',lines:['Roule au dernier moment, pas avant.','Un vrai guerrier respire entre deux coups.','Le dojo forge le corps, la quête forge l\'esprit.']}});
@@ -2285,11 +2285,11 @@ const HALLREQ={2:{lv:3,m:3},3:{lv:5,m:5},4:{lv:8,m:8},5:{lv:10,m:10}};
 const BLDLV=[0,1,3,5,7,9];
 function bldReq(k){const n=S.bld[k]+1;return k==='hall'?(HALLREQ[n]||{lv:1,m:0}):{lv:BLDLV[n]||1,m:0}}
 function bldReqOk(k){const r=bldReq(k),h=curHero();return isAdmin()||(h.lv>=r.lv&&mainDone(h)>=r.m)}
-cost=function(k){const n=S.bld[k]+1,o=k==='hall'?{or:120*n,sceau:3*(n-1)}:{or:50*n,sceau:n};if(n>=3)o.cristal=(k==='hall'?20:10)*(n-2);return o};
-{const _ob=openBld;openBld=function(k){_ob(k);const D=BLD[k],l=S.bld[k];if(l>=D.max)return;const r=bldReq(k),h=curHero(),ok=bldReqOk(k),md=mainDone(h);
-  const P=$('#ovp'),row=P.querySelector('.row');
-  const html=`<div class="skl"><b>Conditions</b> : niveau ${r.lv} <span class="${h.lv>=r.lv?'okc':'no'}">(${h.lv>=r.lv?'✓':'vous : '+h.lv})</span>${r.m?` · ${r.m} chapitres de l'histoire <span class="${md>=r.m?'okc':'no'}">(${md>=r.m?'✓':'vous : '+md})</span>`:''}</div><p class="note">Les sceaux royaux se gagnent avec l'histoire principale (★ rouge) et contre les boss. On ne les ramasse pas dehors.</p>`;
-  if(row)row.insertAdjacentHTML('beforebegin',html);const up=$('#up');if(up&&!ok){up.disabled=true;up.textContent='Conditions non remplies'}}}
+cost=function(k){const n=S.bld[k]+1,o=k==='hall'?{or:200*n,sceau:4*(n-1)}:{or:80*n,sceau:2*n-1};if(n>=3)o.cristal=(k==='hall'?25:12)*(n-2);return o};
+dunLocked=function(){return false};
+const SCEAUB={golem:1,liche:1,wyrm:2,frog:2,samurai:3,squid:4};
+{const _ob=openBld;openBld=function(k){_ob(k);const D=BLD[k],l=S.bld[k];if(l>=D.max)return;const P=$('#ovp'),row=P.querySelector('.row');
+  if(row)row.insertAdjacentHTML('beforebegin',`<p class="note">Les sceaux royaux se gagnent contre les boss (plus les boss sont lointains, plus ils en donnent), sur les élites des régions éloignées et avec l'histoire principale. La ville ne bloque jamais l'histoire.</p>`)}}
 
 /* ---------- PNJ : boutons de métier, intendant ---------- */
 const NPCJOB={forge:[['forge','Améliorer la forge'],['craft','Artisanat']],pretre:[['sanct','Améliorer le sanctuaire'],['craft','Alchimie']],marchand:[['marche','Améliorer le marché'],['trade','Vendre des ressources']],kenji:[['caserne','Améliorer le dojo']],intendant:[['hall','Agrandir la cité'],['city','État de la cité']],herbo:[['craft','Alchimie']]};
@@ -2297,8 +2297,8 @@ const NPCJOB={forge:[['forge','Améliorer la forge'],['craft','Artisanat']],pret
   for(const [k,n] of J){const b=document.createElement('button');b.className='btn sm';b.textContent=n;b.onclick=()=>{if(k==='craft')openCraft();else if(k==='trade')openTrade();else if(k==='city')openCity();else{if(!S.bld[k]&&k!=='hall'){}openBld(k)}};d.appendChild(b)}
   cl.parentNode===P?P.insertBefore(d,cl):P.appendChild(d)}}
 function openCity(){const h=curHero(),md=mainDone(h);
-  panel(`<h2>État de la cité</h2><p>${TIERS[S.bld.hall]} de Cendre · hôtel de ville niveau ${S.bld.hall}</p><div class="qlist">${Object.entries(BLD).map(([k,D])=>{const l=S.bld[k],r=bldReq(k),o=cost(k);return `<div class="qrow"><div class="t"><b>${D.n} · niv. ${l}/${D.max}</b><span>${l>=D.max?'Maximum':`Suivant : niveau ${r.lv}${r.m?', '+r.m+' chapitres':''} · ${Object.entries(o).map(([q,v])=>v+' '+RES[q].n.toLowerCase()).join(', ')}`}</span></div></div>`}).join('')}</div>
-   <p class="note">Vous : niveau ${h.lv} · ${md} chapitres de l'histoire · ${S.res.sceau} sceaux royaux.</p><button class="btn ghost" id="cl">Fermer</button>`)}
+  panel(`<h2>État de la cité</h2><p>${TIERS[S.bld.hall]} de Cendre · hôtel de ville niveau ${S.bld.hall}</p><div class="qlist">${Object.entries(BLD).map(([k,D])=>{const l=S.bld[k],r=bldReq(k),o=cost(k);return `<div class="qrow"><div class="t"><b>${D.n} · niv. ${l}/${D.max}</b><span>${l>=D.max?'Maximum':`Suivant : ${Object.entries(o).map(([q,v])=>v+' '+RES[q].n.toLowerCase()).join(', ')}`}</span></div></div>`}).join('')}</div>
+   <p class="note">Vous avez ${S.res.sceau} sceaux royaux. Les boss lointains en donnent davantage.</p><button class="btn ghost" id="cl">Fermer</button>`)}
 
 /* ---------- artisanat : utilité des ressources de terrain ---------- */
 const CRAFT=[
@@ -2378,7 +2378,7 @@ function bossClear(b){questEvent('boss',b.def.id);gainXP(Math.round(b.def.xp*(b.
   for(const e of world.enemies)if(e.hp>0){e.hp=0;e.dead=true}
   banner(b.def.n+' vaincu ! Un coffre apparaît');G.portalT=0;save()}
 function openBossChest(tr){if(tr.ch.open)return;tr.ch.open=true;const D=DUNGEONS[G.run.id],B=BOSSES[D.boss],aw=world.boss&&world.boss.awake,mul=aw?1.8:1,got={},first=!(S.wins[B.id]>0);
-  for(const k in B.rew)got[k]=Math.round(B.rew[k]*(1+.25*S.bld.marche)*mul);for(const k in G.run.loot)got[k]=(got[k]||0)+G.run.loot[k];got.sceau=(got.sceau||0)+(first?2:1);G.run.loot={};
+  for(const k in B.rew)got[k]=Math.round(B.rew[k]*(1+.25*S.bld.marche)*mul);for(const k in G.run.loot)got[k]=(got[k]||0)+G.run.loot[k];got.sceau=(got.sceau||0)+(SCEAUB[B.id]||1)*(aw?2:1)+(first?2:0);G.run.loot={};
   S.wins[B.id]=(S.wins[B.id]||0)+1;for(const k in got)S.res[k]=(S.res[k]||0)+got[k];
   const its=[];for(let k=0;k<(aw?3:2);k++){const it=genItem(world.tier||1,1,aw?2:1);it.loc=sacN()<SACMAX?'sac':'coffre';S.items.push(it);its.push(it)}
   save();renderRes();sfx('coin',.7);burst(tr.x,tr.y-8,'#ffd34a',40,160);G.shake=.2;
@@ -2399,6 +2399,10 @@ function leaveDungeon(){const t=world.trig.find(t=>t.kind==='bchest');if(t&&!t.c
 /* ---------- armes équipées visibles ---------- */
 function wpnOf(h){const i=S.heroes.indexOf(h);if(i<0)return h.wpn||null;const it=S.items.find(x=>x.loc==='h'+i&&x.slot==='w');return it&&AT[it.ic]?it.ic:null}
 {const _dh=drawHero;drawHero=function(c,h,s,t){if(h&&S.heroes.includes(h))h.wpn=wpnOf(h);return _dh(c,h,s,t)}}
+
+/* sceaux sur les élites des régions éloignées */
+{const _kr=killReward;killReward=function(e){_kr(e);if(e.elite&&(world.tier||1)>=2&&Math.random()<.04*(world.tier||1)){S.res.sceau++;renderRes();float(e.x,e.y-34,'+1 sceau royal','#ff7a6a');sfx('coin',.5);save()}}}
+BLD.hall.d='Fait grandir la cité et plafonne le niveau des autres bâtiments. Tous les donjons sont ouverts dès le départ.';
 
 migrate12(S);
 /* ===== Interface ===== */
@@ -2433,7 +2437,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='15.0';
+const VERSION='15.1';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
