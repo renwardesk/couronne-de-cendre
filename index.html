@@ -384,7 +384,7 @@ function drawHero(c,h,s,t){
   if(s.rollT>0&&!s.lunge){frame(c,n,d,5,16,16,x,y-7,{rot:(d===2?-1:1)*t*22,ay:.5});return}
   const hurt=s.hurtT>0&&Math.floor(t*20)%2;
   const row=s.atkT>0?4:s.moving?Math.floor(t*8)%4:0;
-  const wpn=()=>{if(!(s.atkT>0)){if(h.wpn&&!s.mounted){const sd=d===3?-1:1;frame(c,h.wpn,0,0,0,0,x+sd*5,y-3,{rot:sd*.5,ay:.85,sc:.7})}return}const a=Math.atan2(s.fy,s.fx),k=1-s.atkT/.18;
+  const wpn=()=>{if(!(s.atkT>0)){if(h.wpn&&!s.mounted){const W=[[-5,-2,.45],[5,-5,-.35],[-4,-3,-.95],[4,-3,.95]][d],bob=s.moving?Math.round(Math.sin(t*16)):0;frame(c,h.wpn,0,0,0,0,x+W[0],y+W[1]+bob,{rot:W[2],ay:.85,sc:.7})}return}const a=Math.atan2(s.fy,s.fx),k=1-s.atkT/.18;
     frame(c,h.wpn||C.wpn,0,0,0,0,x+s.fx*7,y-6+s.fy*5,{rot:a+Math.PI/2+(k*1.8-.9),ay:.9})};
   if(d===1)wpn();
   frame(c,n,d,row,16,16,x,y+1,{alpha:hurt?.4:1,tint:s.freezeT>0?'rgba(170,225,255,.55)':s.paraT>0&&Math.floor(t*14)%2?'rgba(255,240,120,.5)':s.poisonT>0?'rgba(120,220,90,.38)':s.slowT>0?'rgba(120,190,255,.3)':s.guardT>0&&Math.floor(t*6)%2?'rgba(255,220,120,.35)':null});
@@ -1887,8 +1887,7 @@ function qState(h,id){return (h.q||{})[id]}
 function qAvail(h,q){const s=qState(h,q.id);if(s&&s.s===1)return false;if(s&&s.s===2&&!q.rep)return false;if((q.lv||1)>h.lv)return false;return (q.req||[]).every(r=>{const x=qState(h,r);return x&&x.s===2})}
 function qReady(h,q){const s=qState(h,q.id);return s&&s.s===1&&s.n>=q.c}
 function npcMark(id){const h=curHero();if(!h)return'';const qs=QUESTS.filter(q=>q.g===id),tk=QUESTS.filter(q=>q.k==='talk'&&q.t===id&&qState(h,q.id)&&qState(h,q.id).s===1);
-  const rd=qs.filter(q=>qReady(h,q)).concat(tk);if(rd.length)return rd.some(q=>q.m)?'?m':'?';
-  const av=qs.filter(q=>qAvail(h,q));if(av.some(q=>q.m))return'!m';if(av.some(q=>!q.rep))return'!';if(av.length)return'·';return''}
+  const rd=qs.filter(q=>qReady(h,q)).concat(tk),av=qs.filter(q=>qAvail(h,q));if(rd.some(q=>q.m))return'?m';if(av.some(q=>q.m))return'!m';if(rd.length)return'?';if(av.some(q=>!q.rep))return'!';if(av.length)return'·';return''}
 function markCol(m){return m.length>1?'#ff4a3a':m==='·'?'#bfb39a':'#ffd34a'}
 function questEvent(k,t,n=1){const h=curHero();if(!h)return;let changed=false;
   for(const q of QUESTS){const s=qState(h,q.id);if(!s||s.s!==1||q.k!==k||s.n>=q.c)continue;
@@ -2272,7 +2271,8 @@ function buildInterior(b,fl){const L=INTERIORS[b][fl],W=L.w,H=L.h;
   for(const [n,x,y,sw,sh] of L.s||[]){if(!AT[n])continue;w.props.push({type:'spr',n,x,y});if(sw)w.solids.push({x:x-sw/2,y:y-sh,w:sw,h:sh})}
   if(L.fire){w.props.push({type:'fire',x:L.fire[0],y:L.fire[1]});w.solids.push({x:L.fire[0]-10,y:L.fire[1]-4,w:20,h:8})}
   for(const [id,x,y] of L.npc||[]){w.npcs.push({id,x,y});NPCS[id].x=x;NPCS[id].y=y;w.solids.push({x:x-5,y:y-4,w:10,h:5});w.trig.push({kind:'npc',id,x,y:y+8,r:20})}
-  if(L.up||L.down){const [x,y]=[W-52,72];w.props.push({type:'spr',n:'c_stairs_h',x,y});w.solids.push({x:x-17,y:y-40,w:34,h:20});w.trig.push({kind:'stair',to:L.up?fl+1:fl-1,x,y:y+6,r:16})}
+  if(L.up){const [x,y]=[W-52,72];w.props.push({type:'spr',n:'c_stairs_h',x,y});w.solids.push({x:x-18,y:26,w:36,h:y-30});w.trig.push({kind:'stair',to:fl+1,x,y:y+8,r:16})}
+  if(L.down){const [x,y]=[W-52,72];w.props.push({type:'hole',x,y});w.solids.push({x:x-17,y:y-38,w:34,h:34});w.trig.push({kind:'stair',to:fl-1,x,y:y+8,r:16})}
   if(L.chest){const [x,y]=L.chest,key=b+fl,ch={type:'chest',x,y,open:!!(S.ichest||{})[key]};w.props.push(ch);w.solids.push({x:x-7,y:y-6,w:14,h:6});w.trig.push({kind:'ichest',ch,key,x,y:y+8,r:16})}
   if(L.craft)w.trig.push({kind:'craft',x:L.craft[0],y:L.craft[1],r:18});
   if(L.trade)w.trig.push({kind:'trade',x:L.trade[0],y:L.trade[1],r:18});
@@ -2374,7 +2374,7 @@ function netInfoTick(){if(!NET.online||!NET.ch||!netMulti())return;const now=per
 
 /* ---------- donjon : coffre du boss puis sortie ---------- */
 function bossClear(b){questEvent('boss',b.def.id);gainXP(Math.round(b.def.xp*(b.awake?1.5:1)));addFx('fx_smoke',b.x,b.y-20,6,32,32,.8,{sc:3});sfx('boom',.6);burst(b.x,b.y-20,b.def.eye,40);G.hz=[];G.bul=[];G.emit=[];
-  const x=clamp(b.x,60,world.w-60),y=clamp(b.y+10,80,world.h-60),ch={type:'chest',x,y,open:false,big:true};world.props.push(ch);world.solids.push({x:x-9,y:y-7,w:18,h:7});world.trig.push({kind:'bchest',ch,x,y:y+10,r:20});
+  const x=clamp(b.x,60,world.w-60),y=clamp(b.y+10,80,world.h-60),ch={type:'chest',x,y,open:false,big:true};world.props.push(ch);world.trig.push({kind:'bchest',ch,x,y:y+10,r:20});
   world.door=true;world.solids=world.solids.filter(s=>!s.door);world.trig.push({kind:'dexit',x:world.w/2,y:20,r:20,auto:true});
   for(const e of world.enemies)if(e.hp>0){e.hp=0;e.dead=true}
   banner(b.def.n+' vaincu ! Un coffre apparaît');G.portalT=0;save()}
@@ -2393,7 +2393,7 @@ function leaveDungeon(){const t=world.trig.find(t=>t.kind==='bchest');if(t&&!t.c
   if(p.dashT>0){p.dashT-=dt;move(p,p.ddx*320*dt,p.ddy*320*dt);if(Math.random()<.7)burst(p.x,p.y+2,'#a89070',1,40)}}
   try{netInfoTick()}catch(e){}
   if(world.trig.some(t=>t.kind==='dexit'))G.portalT=(G.portalT||0)+dt}}
-{const _dv=drawV12;drawV12=function(L,c,t,ox,oy){_dv(L,c,t,ox,oy);const ex=world.trig.find(q=>q.kind==='dexit');
+{const _dv=drawV12;drawV12=function(L,c,t,ox,oy){_dv(L,c,t,ox,oy);for(const h of world.props)if(h.type==='hole')L.push({y:-1e9+1,f:()=>drawHole(c,h.x,h.y)});const ex=world.trig.find(q=>q.kind==='dexit');
   if(ex)L.push({y:-1e8,f:()=>{c.save();c.globalCompositeOperation='lighter';for(let k=0;k<3;k++){c.globalAlpha=.25+.1*Math.sin(t*4+k);c.fillStyle=['#7fd4ff','#b07aff','#ffffff'][k];c.beginPath();c.ellipse(ex.x,ex.y+4,18-k*5,10-k*3,0,0,7);c.fill()}c.restore();
     txt(c,'Sortie',ex.x,ex.y+26,'#bfe8ff','9px "Alegreya Sans", sans-serif','center')}})}}
 
@@ -2404,6 +2404,10 @@ function wpnOf(h){const i=S.heroes.indexOf(h);if(i<0)return h.wpn||null;const it
 /* sceaux sur les élites des régions éloignées */
 {const _kr=killReward;killReward=function(e){_kr(e);if(e.elite&&(world.tier||1)>=2&&Math.random()<.04*(world.tier||1)){S.res.sceau++;renderRes();float(e.x,e.y-34,'+1 sceau royal','#ff7a6a');sfx('coin',.5);save()}}}
 BLD.hall.d='Fait grandir la cité et plafonne le niveau des autres bâtiments. Tous les donjons sont ouverts dès le départ.';
+
+function drawHole(c,x,y){const w=34,h=40,x0=x-w/2,y0=y-h;c.fillStyle='#3a2a1c';c.fillRect(x0-2,y0-2,w+4,h+4);
+  for(let k=0;k<6;k++){const sh=Math.round(150-k*22);c.fillStyle=`rgb(${sh},${Math.round(sh*.78)},${Math.round(sh*.55)})`;c.fillRect(x0+k,y0+k*6,w-2*k,6);c.fillStyle='rgba(0,0,0,.35)';c.fillRect(x0+k,y0+k*6+5,w-2*k,1)}
+  c.fillStyle='#0c0806';c.fillRect(x0+6,y0+36,w-12,4);c.strokeStyle='#6a4a30';c.lineWidth=2;c.strokeRect(x0-1,y0-1,w+2,h+2)}
 
 /* ================= v16 : clés de donjon, niveaux minimum, enjeux de la ville, outils admin ================= */
 const DUNLV={golem:2,liche:4,wyrm:6,frog:7,samurai:9,squid:11};
@@ -2517,7 +2521,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='16.0';
+const VERSION='16.1';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
