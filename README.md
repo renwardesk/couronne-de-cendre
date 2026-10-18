@@ -29,4 +29,5 @@ Action-RPG 2D vu de dessus, **coop en ligne** : une ville-château partagée que
 - [Ninja Adventure](https://pixel-boy.itch.io/ninja-adventure-asset-pack) — Pixel-boy & AAA, CC0.
 - [Pixel Art Top Down – Basic](https://cainos.itch.io/pixel-art-top-down-basic) — Cainos.
 - Assets [ansimuz](https://ansimuz.itch.io/) et pack d'interface fourni par l'auteur.
-- Musiques et sons : Ninja Adventure (CC0).
+- Musiques : bande originale de [Flare](https://github.com/flareteam/flare-game) par Brandon Morris, CC-BY-SA 3.0.
+- Sons : Ninja Adventure (CC0).

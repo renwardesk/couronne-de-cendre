@@ -1161,7 +1161,7 @@ async function netPullShared(){
   const w=await NET.sb.from('cendre_world').select('data').eq('k','city').maybeSingle();if(w.data)S.bld=Object.assign({hall:1,forge:0,sanct:0,caserne:0,marche:0},w.data.data.bld);
   const pl=await NET.sb.from('cendre_plots').select('*').order('id');if(pl.data)for(const r of pl.data)netPlotRow(r);
 }
-function netPlotRow(r){if(r.id>=PLOTS.length)return;S.plots[r.id]={owner:r.owner?(r.owner===NET.uid?0:9):-1,mine:r.owner===NET.uid,ownerName:r.owner_name,lvl:r.lvl,furn:r.furn||[]}}
+function netPlotRow(r){if(r.id>=PLOTS.length)return;const old=S.plots[r.id],keep=old&&r.owner===NET.uid&&((NET.furnQ&&NET.furnQ[r.id])||(typeof G!=='undefined'&&G&&G.carry&&G.carry.plot===r.id))?old.furn:null;S.plots[r.id]={owner:r.owner?(r.owner===NET.uid?0:9):-1,mine:r.owner===NET.uid,ownerName:r.owner_name,lvl:r.lvl,furn:keep||r.furn||[]}}
 function plotName(P){return P.ownerName||((S.heroes[P.owner]||{}).name)||'?'}
 function plotMine(P){return NET.online?!!P.mine:P.owner>=0}
 function netDbChannel(){
@@ -1182,7 +1182,6 @@ async function netRpc(fn,args){
   if(NET.busy)return null;NET.busy=true;
   try{await netFlush();const r=await NET.sb.rpc(fn,args);if(r.error){const p=G.players[0];float(p.x,p.y-30,r.error.message,'#ff9a70');$('#ovp')&&!$('#ov').hidden&&($('#ovp').insertAdjacentHTML('beforeend',`<p class="no">${r.error.message}</p>`));return null}return r.data||{}}
   catch(e){return null}finally{NET.busy=false}}
-function netFurn(i){if(NET.online)netRpc('cendre_set_furn',{i,f:S.plots[i].furn})}
 async function netLogout(){try{await netFlush();await NET.sb.auth.signOut()}catch(e){}location.reload()}
 addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')netFlush()});
 /* ---------- présence et joueurs visibles ---------- */
@@ -1308,6 +1307,7 @@ const RLAY={
  pics:{w:1920,h:1280,camp:[640,640],exits:[{to:'desert',x:6,y:700}],dun:{squid:[1380,420]},
    lakes:[[1100,950,180,90]],forests:8,rocks:8,mobs:['spirit','eye','bat','archer','beast','owl','mollusc','cyclope2','spirit2','eye2'],
    nodes:{pierre:10,fer:9,cristal:12,herbe:4,bois:6},poi:[[1650,1000,'ruins'],[300,250,'grove']]}};
+REG.foret.music='forest';REG.desert.music='desert';REG.pics.music='snow';
 for(const r in RLAY){const L=RLAY[r];L.mobs=L.mobs.filter(m=>MOBS[m]);REG[r].exits=L.exits;for(const d in L.dun){DUNGEONS[d].x=L.dun[d][0];DUNGEONS[d].y=L.dun[d][1]}}
 const NODEDEF={bois:{n:'Bois',spr:['tree_trunk','n_stump'],sc:[1,1.5],amt:[4,7]},pierre:{n:'Pierre',spr:['rocks_grey'],sc:[.6],amt:[4,7]},fer:{n:'Fer',spr:['n_ore','n_ore2'],sc:[1.6,1.6],amt:[2,4]},
   herbe:{n:'Herbes',spr:['n_herb1','n_herb2','n_herb3'],sc:[1.3,1.3,1.3],amt:[2,4]},cristal:{n:'Cristal',spr:['n_crystal','n_gem_b','n_gem_p'],sc:[1,1.4,1.4],amt:[1,3]}};
@@ -1775,6 +1775,7 @@ function openSign(){const L=RLAY[world.id];const dirs=L.exits.map(e=>`<li>${e.to
 
 /* ---------- fonctions du moteur réécrites pour v12 ---------- */
 function go(kind,arg){
+  dropCarryBack();
   G.hz=[];G.ahz=[];G.bul=[];G.bolts=[];G.floats=[];G.parts=[];G.items=[];G.fx=[];G.zaps=[];G.zones=[];G.emit=[];G.amb=[];G.loot=[];G.carry=null;
   let sx,sy;
   if(kind==='field')kind='region',arg={id:'plaine',from:'capitale'};
@@ -1784,8 +1785,8 @@ function go(kind,arg){
     const e=LY.exits.find(e=>e.to===arg.from),D=arg.at&&DUNGEONS[arg.at];
     if(D){sx=D.x;sy=D.y+26}else if(e){sx=e.x+(e.x<20?44:e.x>LY.w-20?-44:0);sy=e.y+(e.y<20?44:e.y>LY.h-20?-44:0)}else{sx=LY.camp[0];sy=LY.camp[1]+70}
     banner(R.n);music(R.music)}
-  if(kind==='estates'){world=buildEstates();if(arg&&arg.plot!=null){sx=PLOTS[arg.plot][0];sy=PLOTS[arg.plot][1]+22}else{sx=600;sy=276}banner(world.name);music('town')}
-  if(kind==='house'){world=buildHouse(arg.plot);sx=world.w/2;sy=world.h-30;banner(world.name)}
+  if(kind==='estates'){world=buildEstates();if(arg&&arg.plot!=null){sx=PLOTS[arg.plot][0];sy=PLOTS[arg.plot][1]+22}else{sx=600;sy=276}banner(world.name);music('home')}
+  if(kind==='house'){world=buildHouse(arg.plot);sx=world.w/2;sy=world.h-30;banner(world.name);music('home')}
   if(kind==='dungeon'){const {id,idx}=arg,D=DUNGEONS[id];world=buildRoom(id,idx);sx=world.w/2;sy=world.h-30;world.tier=REG[D.region].tier;world.dmul=1+.4*(world.tier-1);
     if(world.tier>1){for(const e of world.enemies){const k=1+.6*(world.tier-1);e.hp=e.maxhp=Math.round(e.maxhp*k);e.lv*=k}}
     if(idx===0||!G.run||G.run.id!==id)G.run={id,loot:{}};if(idx>0)G.players.forEach(p=>{if(!p.down)p.hp=Math.min(p.maxhp,p.hp+p.maxhp*.25)});
@@ -1994,7 +1995,7 @@ function openFurn(j,p){const P=S.plots[world.plot],f=P.furn[j],F=FURN[f.k];
   const r=$('#rest');if(r)r.onclick=()=>{G.players.forEach(q=>{q.hp=q.maxhp;q.st=q.maxst;cleanse(q)});closeOv();banner('Repos complet');sfx('heal',.5)};
   const s=$('#st');if(s)s.onclick=()=>{closeOv();openBag('coffre')};
   $('#rot').onclick=()=>{f.r=((f.r||0)+1)%4;save();netFurn(world.plot);const pos=G.players.map(o=>[o.x,o.y]);world=buildHouse(world.plot);G.players.forEach((o,k)=>{o.x=pos[k][0];o.y=pos[k][1];for(let n=0;n<8&&blockedAt(world,o.x,o.y,5);n++)o.y+=8});sfx('roll',.2)};
-  $('#mv').onclick=()=>{P.furn.splice(j,1);G.carry={k:f.k,p:p.i,free:true,rot:f.r||0};world=keepPos(buildHouse(world.plot));closeOv();banner('Action : poser · Roulade : tourner')};
+  $('#mv').onclick=()=>{P.furn.splice(j,1);save();netFurn(world.plot);G.carry={k:f.k,p:p.i,free:true,rot:f.r||0,orig:{k:f.k,x:f.x,y:f.y,r:f.r||0},plot:world.plot};world=keepPos(buildHouse(world.plot));closeOv();banner('Action : poser · Roulade : tourner')};
   $('#rm').onclick=()=>{P.furn.splice(j,1);for(const k in F.cost)S.res[k]+=Math.floor(F.cost[k]/2);renderRes();save();netFurn(world.plot);world=keepPos(buildHouse(world.plot));closeOv()};
 }
 /* ---------- cité : maisons habitées et route du domaine ---------- */
@@ -2015,7 +2016,7 @@ function townExtra(w){
   w.trig.push({kind:'exit',to:'estates',x:4,y:950,r:22,auto:true});
   w.props.push({type:'spr',n:'n_sign',x:46,y:928});w.trig.push({kind:'tsign',x:46,y:938,r:16})}
 /* ---------- musiques personnelles (fichiers du joueur, gardés sur son appareil) ---------- */
-const MSLOTS=[['town','Cité et domaine'],['field','Régions'],['dungeon','Donjons'],['crypt','Crypte et grotte de cristal'],['boss','Combats de boss']];
+const MSLOTS=[['town','Cité'],['home','Domaine et maisons'],['field','Plaine des Ronces'],['forest','Forêt d\'Émeraude'],['desert','Désert d\'Ambre'],['snow','Pics Gelés'],['dungeon','Donjons'],['crypt','Crypte et grotte de cristal'],['boss','Combats de boss']];
 function idb(){return new Promise((ok,ko)=>{const r=indexedDB.open('cc-music',1);r.onupgradeneeded=()=>r.result.createObjectStore('m');r.onsuccess=()=>ok(r.result);r.onerror=()=>ko(r.error)})}
 async function idbGet(k){try{const d=await idb();return await new Promise(ok=>{const q=d.transaction('m').objectStore('m').get(k);q.onsuccess=()=>ok(q.result||null);q.onerror=()=>ok(null)})}catch(e){return null}}
 async function idbSet(k,v){const d=await idb();return new Promise((ok,ko)=>{const t=d.transaction('m','readwrite');if(v==null)t.objectStore('m').delete(k);else t.objectStore('m').put(v,k);t.oncomplete=()=>ok();t.onerror=()=>ko(t.error)})}
@@ -2023,10 +2024,16 @@ AU.cust={};
 function custBuf(n){if(AU.cust[n]!==undefined)return AU.cust[n];AU.cust[n]=idbGet(n).then(v=>v&&v.data?new Promise((ok,ko)=>AU.ctx.decodeAudioData(v.data.slice(0),ok,ko)):null).then(b=>AU.cust[n]=b).catch(()=>AU.cust[n]=null);return AU.cust[n]}
 async function renderMusics(){const el=$('#musics');if(!el)return;
   const rows=await Promise.all(MSLOTS.map(async([k,n])=>{const v=await idbGet(k);return `<div class="mrow"><b>${n}</b><span class="mn">${v?esc(v.name):'musique du jeu'}</span><label class="btn ghost sm">Choisir<input type="file" accept="audio/*" data-m="${k}" hidden></label>${v?`<button class="btn ghost sm" data-mr="${k}">Retirer</button>`:''}</div>`}));
-  el.innerHTML=`<span class="lbl">Musiques personnelles</span><p class="note">Choisissez vos propres fichiers audio (mp3, m4a, ogg…) : ils restent sur cet appareil et remplacent la musique du jeu dans chaque lieu.</p>${rows.join('')}<p class="note" id="mmsg"></p>`;
+  el.innerHTML=`<span class="lbl">Musiques personnelles</span><p class="note">Choisissez vos propres fichiers audio (mp3, m4a, ogg…) : ils restent sur cet appareil et remplacent la musique du jeu dans chaque lieu.</p>${rows.join('')}<p class="note" id="mmsg"></p><p class="note" style="font-size:12px">Musiques du jeu : bande originale de Flare par Brandon Morris, licence CC-BY-SA 3.0.</p>`;
   el.querySelectorAll('input[data-m]').forEach(inp=>inp.onchange=async()=>{const f=inp.files[0];if(!f)return;const k=inp.dataset.m;$('#mmsg').textContent='Chargement de '+f.name+'…';
     try{const data=await f.arrayBuffer();await idbSet(k,{name:f.name,data});AU.cust[k]=undefined;audioInit();if(AU.cur===k){AU.cur=null;music(k)}$('#mmsg').textContent='Musique enregistrée.'}catch(e){$('#mmsg').textContent='Impossible d\'enregistrer ce fichier.'}renderMusics()});
   el.querySelectorAll('[data-mr]').forEach(b=>b.onclick=async()=>{const k=b.dataset.mr;await idbSet(k,null);AU.cust[k]=undefined;if(AU.cur===k){AU.cur=null;music(k)}renderMusics()})}
+
+/* ---------- synchronisation du mobilier : toujours le dernier état, jamais d'envoi perdu ---------- */
+function netFurn(i){if(!NET.online)return;NET.furnQ=NET.furnQ||{};NET.furnQ[i]=1;clearTimeout(NET.furnT);
+  NET.furnT=setTimeout(async function send(){if(NET.busy){NET.furnT=setTimeout(send,300);return}const ks=Object.keys(NET.furnQ);NET.furnQ={};
+    for(const k of ks){const r=await netRpc('cendre_set_furn',{i:+k,f:S.plots[+k].furn});if(r===null){NET.furnQ[k]=1;NET.furnT=setTimeout(send,1500)}}},200)}
+function dropCarryBack(){const c=G&&G.carry;if(!c||!c.orig||c.plot==null)return;const P=S.plots[c.plot];if(!P.furn.some(f=>f.x===c.orig.x&&f.y===c.orig.y&&f.k===c.orig.k))P.furn.push(c.orig);G.carry=null;save();netFurn(c.plot)}
 
 migrate12(S);
 /* ===== Interface ===== */
@@ -2061,7 +2068,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='13.1';
+const VERSION='13.2';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
