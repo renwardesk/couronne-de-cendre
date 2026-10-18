@@ -196,6 +196,21 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
 #bPot{line-height:1.05}#bPot b{font-size:12px}
 .ieq{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;text-align:left}.ieq div{display:flex;flex-direction:column;border-bottom:1px solid var(--line);padding:2px 0}.ieq small{color:var(--muted);font-size:11px}
 .unl{display:flex;flex-direction:column;gap:3px;text-align:left;margin:8px 0;font-size:13px}.unl div{opacity:.55}.unl .got{opacity:1;color:#7fe07a}.unl .next{opacity:1;color:#ffd34a}
+/* v17 carte */
+.map2{position:fixed;inset:0;z-index:55;background:#1c1510;display:flex;flex-direction:column}
+.map2 .mbar{display:flex;gap:8px;align-items:center;padding:6px 10px calc(6px) 10px;padding-top:max(6px,env(safe-area-inset-top));border-bottom:2px solid #6b5132;background:#2a2018;flex-wrap:wrap}
+.map2 .mbar b{flex:1;font-family:"Pirata One",Georgia,serif;font-size:20px;color:#f2e2b8;min-width:120px}
+.map2 .seg button{padding:5px 12px}
+.map2 .mwrap{flex:1;position:relative;overflow:hidden}
+.map2 canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.mcard{position:absolute;right:10px;bottom:10px;max-width:min(380px,calc(100% - 20px));background:#f0e2bd;color:#2a1a10;border:3px solid #6b5132;border-radius:6px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.mcard h3{margin:0 0 4px;font-family:"Pirata One",Georgia,serif;font-size:20px;color:#3a2414}.mcard p{margin:3px 0;font-size:13px}.mcard .note{color:#5a4a30}
+.mcard .row{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}.mcard .no{color:#b0301c}.mcard .okc{color:#2a7a2a}
+.mcard select{width:100%;font:inherit;padding:4px;margin-top:2px}
+.mleg{position:absolute;left:8px;bottom:8px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#f2e2b8;background:rgba(28,21,16,.75);padding:4px 8px;border-radius:4px;max-width:60%}
+.mleg .lg{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.qrow.tracked{outline:2px solid #ffd34a}.trk{color:#ffd34a;font-weight:400}.qrow[data-tq]{cursor:pointer}
+@media (max-width:700px){.mcard{left:10px;right:10px;max-width:none}.mleg{display:none}}
 
 </style>
 </head>
@@ -2488,6 +2503,225 @@ function enchCost(it){return{or:60*it.tier,cristal:3*it.tier,herbe:5}}
   $('#adBld').onclick=async()=>{if(!NET.online){for(const k in BLD)S.bld[k]=5;save();refreshStats();banner('Ville au max (hors ligne)');return}for(const k of Object.keys(BLD)){const r=await netRpc('cendre_admin_setbld',{b:k,l:5});if(r&&r.bld)S.bld=r.bld}save();refreshStats();banner('Ville au maximum')};
   $('#adQ').onclick=()=>{const q=QUESTS.find(q=>q.m&&!(qState(h,q.id)&&qState(h,q.id).s===2));if(!q)return banner('Histoire terminée');h.q[q.id]={s:2,n:q.c};if(q.k==='boss')giveKey(q.t);save();renderHeroes();banner('Chapitre validé : '+q.n)}}}
 
+/* ================= v17 : cartes illustrées, brouillard, repères, suivi de quête, voyage ================= */
+PERSO.push('pot','buffs','ichest','fog','pin','track');
+regionLocked=function(){return false};
+const WMAP={w:1280,h:720};
+const WPOS=()=>{const P={capitale:[MAPN.capitale[0]*2,MAPN.capitale[1]*2],estates:[MAPN.estates[0]*2,MAPN.estates[1]*2]};for(const k in REG)P[k]=[REG[k].map[0]*2,REG[k].map[1]*2];return P};
+const BIOME={plaine:['#b9cf78','plaine'],foret:['#78a95e','foret'],desert:['#e6c886','desert'],pics:['#e4eaef','pics'],capitale:['#cdd59a','cite']};
+const FOGC=64;
+const MV={world:{s:1,x:0,y:0,fit:false},region:{s:1,x:0,y:0,fit:false,id:null}};
+let MAP={open:false,mode:'world',pois:[],sel:null,art:{},raf:0,rid:null};
+
+/* ---------- brouillard de guerre par région ---------- */
+function fogGrid(id){const L=RLAY[id];return[Math.ceil(L.w/FOGC),Math.ceil(L.h/FOGC)]}
+function fogGet(id){S.fog=S.fog||{};const [gw,gh]=fogGrid(id);let f=S.fog[id];if(!f||f.length!==gw*gh)f=S.fog[id]='0'.repeat(gw*gh);return f}
+let fogT=0,fogVer=0;
+function fogReveal(){if(!world||world.kind!=='field'||!RLAY[world.id])return;const id=world.id,[gw,gh]=fogGrid(id);let f=fogGet(id).split(''),ch=false;
+  for(const p of G.players){const cx=p.x/FOGC,cy=p.y/FOGC,R=4.2;for(let y=Math.max(0,Math.floor(cy-R));y<=Math.min(gh-1,Math.ceil(cy+R));y++)for(let x=Math.max(0,Math.floor(cx-R));x<=Math.min(gw-1,Math.ceil(cx+R));x++){const i=y*gw+x;if(f[i]!=='1'&&Math.hypot(x+.5-cx,y+.5-cy)<=R){f[i]='1';ch=true}}}
+  if(ch){S.fog[id]=f.join('');fogVer++}}
+function fogSeen(id,x,y){const [gw]=fogGrid(id),f=fogGet(id);return f[Math.floor(y/FOGC)*gw+Math.floor(x/FOGC)]==='1'}
+function fogPct(id){const f=fogGet(id);let n=0;for(const ch of f)if(ch==='1')n++;return Math.round(100*n/f.length)}
+{const _u=updV12;updV12=function(dt){_u(dt);if((fogT-=dt)<=0){fogT=.35;fogReveal()}if(S.pin&&world&&S.pin.r===world.id&&G.players[0]&&dist(G.players[0].x,G.players[0].y,S.pin.x,S.pin.y)<34){S.pin=null;banner('Repère atteint');sfx('ok',.4);save()}}}
+
+/* ---------- objectif de quête suivi ---------- */
+function trackedQuest(){const h=curHero();if(!h)return null;const act=QUESTS.filter(q=>{const s=qState(h,q.id);return s&&s.s===1});
+  return act.find(q=>q.id===S.track)||act.find(q=>q.m)||act[0]||null}
+function npcWhere(id){const N=NPCS[id];if(!N)return null;const z=N.zone||'';if(z==='capital'||z.startsWith('in:'))return{reg:'capitale',lbl:N.n};
+  if(RLAY[z]){const L=RLAY[z];return{reg:z,x:L.camp[0]+(N.dx||0),y:L.camp[1]+(N.dy||0),lbl:N.n}}return null}
+function questTarget(q){q=q||trackedQuest();if(!q)return null;const h=curHero();
+  if(qReady(h,q))return Object.assign({q},npcWhere(q.g)||{});
+  if(q.k==='boss'&&DUNGEONS[q.t]){const D=DUNGEONS[q.t];return{q,reg:D.region,x:D.x,y:D.y,lbl:D.n}}
+  if(q.k==='talk')return Object.assign({q},npcWhere(q.t)||{});
+  if(q.k==='visit')return{q,reg:q.t,lbl:REG[q.t]?REG[q.t].n:''};
+  if(q.k==='kill'){const r=Object.keys(RLAY).find(r=>q.t==='any'?r===(world&&world.id):RLAY[r].mobs.includes(q.t));return r?{q,reg:r,lbl:REG[r].n}:{q}}
+  if(q.k==='gather'){const r=world&&RLAY[world.id]&&RLAY[world.id].nodes[q.t]?world.id:Object.keys(RLAY).find(r=>RLAY[r].nodes[q.t]);return r?{q,reg:r,lbl:REG[r].n}:{q}}
+  return{q}}
+function hereReg(){if(!world)return'capitale';if(world.kind==='dungeon')return DUNGEONS[world.id].region;if(world.id==='estates'||world.id==='house')return'estates';if(RLAY[world.id])return world.id;return'capitale'}
+
+/* ---------- flèches en jeu : repère et objectif ---------- */
+{const _dv=drawV12;drawV12=function(L,c,t,ox,oy){_dv(L,c,t,ox,oy);if(!world||world.kind!=='field')return;
+  const tg=[];if(S.pin&&S.pin.r===world.id)tg.push({x:S.pin.x,y:S.pin.y,col:'#ffffff',lbl:'Repère'});
+  const qt=questTarget();if(qt&&qt.reg===world.id&&qt.x!=null)tg.push({x:qt.x,y:qt.y,col:qt.q.m?'#ff5a3a':'#ffd34a',lbl:qt.q.n});
+  if(!tg.length)return;
+  L.push({y:1e9,f:()=>{const p=G.players[0];for(const g of tg){const inView=g.x>ox+8&&g.x<ox+VW-8&&g.y>oy+8&&g.y<oy+VH-8,d=Math.round(dist(p.x,p.y,g.x,g.y)/16);
+    if(inView){const b=Math.sin(t*5)*2;c.fillStyle=g.col;c.beginPath();c.moveTo(g.x,g.y-14+b);c.lineTo(g.x-5,g.y-24+b);c.lineTo(g.x+5,g.y-24+b);c.fill();c.strokeStyle='rgba(0,0,0,.6)';c.lineWidth=1;c.stroke();continue}
+    const cx=ox+VW/2,cy=oy+VH/2,a=Math.atan2(g.y-cy,g.x-cx),m=16,hw=VW/2-m,hh=VH/2-m-(VH>VW?40:0),k=Math.min(Math.abs(hw/Math.cos(a)),Math.abs(hh/Math.sin(a))),ax=cx+Math.cos(a)*k,ay=cy+Math.sin(a)*k;
+    c.save();c.translate(ax,ay);c.rotate(a);c.fillStyle=g.col;c.strokeStyle='rgba(0,0,0,.7)';c.lineWidth=1.5;c.beginPath();c.moveTo(8,0);c.lineTo(-6,-6);c.lineTo(-3,0);c.lineTo(-6,6);c.closePath();c.fill();c.stroke();c.restore();
+    txt(c,d+' m',ax-Math.cos(a)*14,ay-Math.sin(a)*14+3,g.col,'bold 8px "Alegreya Sans", sans-serif','center')}}});
+  if(S.pin&&S.pin.r===world.id)L.push({y:S.pin.y,f:()=>{const x=S.pin.x,y=S.pin.y;c.fillStyle='#5a3a20';c.fillRect(x,y-18,2,18);c.fillStyle='#ffffff';c.beginPath();c.moveTo(x+2,y-18);c.lineTo(x+12,y-14);c.lineTo(x+2,y-10);c.fill();c.strokeStyle='#3a2414';c.stroke()}})}}
+
+/* ---------- interface de la carte ---------- */
+document.body.insertAdjacentHTML('beforeend',`<div id="map2" class="map2" hidden><div class="mbar"><div class="seg" id="mtabs"><button data-m="world">Monde</button><button data-m="region">Région</button></div><b id="mtitle"></b>
+  <button class="btn ghost sm" id="mzo" aria-label="Dézoomer">−</button><button class="btn ghost sm" id="mzi" aria-label="Zoomer">+</button><button class="btn ghost sm" id="mfit">Recentrer</button><button class="btn sm" id="mcl">Reprendre</button></div>
+  <div class="mwrap"><canvas id="mapc2"></canvas><div class="mcard" id="mcard" hidden></div><div class="mleg" id="mleg"></div></div></div>`);
+openMap=function(){if(MAP.open){closeMap();return}MAP.open=true;menuOpen=true;$('#map2').hidden=false;MAP.sel=null;$('#mcard').hidden=true;
+  MAP.mode=world&&world.kind==='field'&&RLAY[world.id]?'region':'world';MAP.rid=RLAY[world&&world.id]?world.id:null;MV.region.fit=false;MV.world.fit=false;mapResize();mapLoop()};
+closeMap=function(){MAP.open=false;menuOpen=false;$('#map2').hidden=true;cancelAnimationFrame(MAP.raf);K={};KP={};resize()};
+$('#bMap').onclick=openMap;$('#mcl').onclick=closeMap;
+document.querySelectorAll('#mtabs button').forEach(b=>b.onclick=()=>{const m=b.dataset.m;if(m==='region'&&!MAP.rid){MAP.rid=RLAY[hereReg()]?hereReg():null;if(!MAP.rid){mapToast('Choisissez une région sur la carte du monde.');return}}MAP.mode=m;MAP.sel=null;$('#mcard').hidden=true;MV[m].fit=false});
+function mapToast(t){const c=$('#mcard');c.hidden=false;c.innerHTML=`<p>${t}</p><div class="row"><button class="btn ghost sm" id="mcx">Fermer</button></div>`;$('#mcx').onclick=()=>{c.hidden=true;MAP.sel=null}}
+function mapResize(){const cv=$('#mapc2'),r=cv.parentNode.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);cv.width=Math.round(r.width*d);cv.height=Math.round(r.height*d);cv.style.width=r.width+'px';cv.style.height=r.height+'px';MAP.dpr=d;MAP.cw=r.width;MAP.ch=r.height}
+addEventListener('resize',()=>{if(MAP.open){mapResize();MV[MAP.mode].fit=false}});
+function mapSize(){if(MAP.mode==='world')return[WMAP.w,WMAP.h];const L=RLAY[MAP.rid];return[L.w*.5,L.h*.5]}
+function mapFit(){const V=MV[MAP.mode],[w,h]=mapSize(),s=Math.min(MAP.cw/w,MAP.ch/h)*.96;V.s=s;V.x=(MAP.cw-w*s)/2;V.y=(MAP.ch-h*s)/2;V.fit=true;V.min=s*.8}
+function mapZoom(f,cx,cy){const V=MV[MAP.mode];cx=cx==null?MAP.cw/2:cx;cy=cy==null?MAP.ch/2:cy;const ns=Math.max(V.min||.2,Math.min(V.min*8||6,V.s*f));V.x=cx-(cx-V.x)*ns/V.s;V.y=cy-(cy-V.y)*ns/V.s;V.s=ns}
+$('#mzi').onclick=()=>mapZoom(1.35);$('#mzo').onclick=()=>mapZoom(1/1.35);$('#mfit').onclick=()=>mapFit();
+{const cv=$('#mapc2'),pts=new Map();let st=null,moved=false;
+  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.offsetX,y:e.offsetY});const V=MV[MAP.mode];st={x:V.x,y:V.y,s:V.s,p:new Map(pts)};moved=false});
+  cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId)||!st)return;pts.set(e.pointerId,{x:e.offsetX,y:e.offsetY});const V=MV[MAP.mode],a=[...pts.values()],b=[...st.p.values()];
+    if(a.length>=2&&b.length>=2){const d0=Math.hypot(b[0].x-b[1].x,b[0].y-b[1].y),d1=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),mx=(a[0].x+a[1].x)/2,my=(a[0].y+a[1].y)/2;V.s=st.s;V.x=st.x;V.y=st.y;mapZoom(d1/Math.max(1,d0),mx,my);moved=true}
+    else if(a.length===1){const dx=a[0].x-b[0].x,dy=a[0].y-b[0].y;if(Math.hypot(dx,dy)>6)moved=true;if(moved){V.x=st.x+dx;V.y=st.y+dy}}});
+  const up=e=>{const was=pts.size;pts.delete(e.pointerId);if(!pts.size&&!moved&&was===1)mapTap(e.offsetX,e.offsetY);const V=MV[MAP.mode];st=pts.size?{x:V.x,y:V.y,s:V.s,p:new Map(pts)}:null};
+  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',e=>{pts.delete(e.pointerId);st=null});
+  cv.addEventListener('wheel',e=>{e.preventDefault();mapZoom(e.deltaY<0?1.15:1/1.15,e.offsetX,e.offsetY)},{passive:false})}
+function mapLoop(){if(!MAP.open)return;try{drawMap2()}catch(e){console.error(e)}MAP.raf=requestAnimationFrame(mapLoop)}
+
+/* ---------- dessin : outils ---------- */
+function rng(s){return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646}}
+function glyphTree(c,x,y,r,col){c.fillStyle='#5a3a20';c.fillRect(x-1,y,2,r*.7);c.fillStyle=col;c.beginPath();c.arc(x,y,r,0,7);c.fill();c.strokeStyle='rgba(30,40,20,.6)';c.lineWidth=1;c.stroke();c.fillStyle='rgba(255,255,255,.18)';c.beginPath();c.arc(x-r*.3,y-r*.3,r*.4,0,7);c.fill()}
+function glyphPine(c,x,y,r,snow){c.fillStyle='#2f5a34';c.beginPath();c.moveTo(x,y-r*1.6);c.lineTo(x-r,y+r*.4);c.lineTo(x+r,y+r*.4);c.closePath();c.fill();if(snow){c.fillStyle='#fff';c.beginPath();c.moveTo(x,y-r*1.6);c.lineTo(x-r*.4,y-r*.7);c.lineTo(x+r*.4,y-r*.7);c.fill()}}
+function glyphMount(c,x,y,r){c.fillStyle='#8c919c';c.beginPath();c.moveTo(x-r,y);c.lineTo(x,y-r*1.3);c.lineTo(x+r,y);c.closePath();c.fill();c.fillStyle='#6a6f7a';c.beginPath();c.moveTo(x,y-r*1.3);c.lineTo(x+r,y);c.lineTo(x+r*.2,y);c.closePath();c.fill();
+  c.fillStyle='#fff';c.beginPath();c.moveTo(x,y-r*1.3);c.lineTo(x-r*.38,y-r*.8);c.lineTo(x-r*.1,y-r*.9);c.lineTo(x+r*.15,y-r*.75);c.lineTo(x+r*.38,y-r*.8);c.closePath();c.fill();c.strokeStyle='rgba(40,40,50,.5)';c.lineWidth=1;c.beginPath();c.moveTo(x-r,y);c.lineTo(x,y-r*1.3);c.lineTo(x+r,y);c.stroke()}
+function glyphDune(c,x,y,r){c.strokeStyle='#b88a44';c.lineWidth=1.5;c.beginPath();c.arc(x,y+r,r,Math.PI*1.15,Math.PI*1.85);c.stroke()}
+function glyphCactus(c,x,y){c.fillStyle='#4f8a46';c.fillRect(x-1.5,y-9,3,9);c.fillRect(x-5,y-6,2,4);c.fillRect(x-5,y-6,4,2);c.fillRect(x+3,y-7,2,4);c.fillRect(x+1,y-5,4,2)}
+function glyphCastle(c,x,y){c.fillStyle='#9a8a74';c.fillRect(x-16,y-12,32,16);c.fillRect(x-20,y-20,8,24);c.fillRect(x+12,y-20,8,24);c.fillRect(x-5,y-26,10,30);c.fillStyle='#c0503a';c.beginPath();c.moveTo(x-5,y-26);c.lineTo(x,y-34);c.lineTo(x+5,y-26);c.fill();c.fillStyle='#3a2a1a';c.fillRect(x-3,y-4,6,8);c.strokeStyle='#4a3a2a';c.lineWidth=1;c.strokeRect(x-16,y-12,32,16)}
+function glyphHut(c,x,y){c.fillStyle='#b08850';c.fillRect(x-8,y-6,16,10);c.fillStyle='#8a4a2a';c.beginPath();c.moveTo(x-11,y-6);c.lineTo(x,y-15);c.lineTo(x+11,y-6);c.fill()}
+function glyphCave(c,x,y,col){c.fillStyle='#6a5a4a';c.beginPath();c.arc(x,y,9,Math.PI,0);c.lineTo(x+9,y+4);c.lineTo(x-9,y+4);c.fill();c.fillStyle='#1a1410';c.beginPath();c.arc(x,y+2,5,Math.PI,0);c.lineTo(x+5,y+4);c.lineTo(x-5,y+4);c.fill();if(col){c.fillStyle=col;c.beginPath();c.arc(x,y-1,1.6,0,7);c.fill()}}
+function glyphTent(c,x,y){c.fillStyle='#c8a050';c.beginPath();c.moveTo(x-9,y+5);c.lineTo(x,y-9);c.lineTo(x+9,y+5);c.fill();c.fillStyle='#5a3a20';c.beginPath();c.moveTo(x-2,y+5);c.lineTo(x,y-2);c.lineTo(x+2,y+5);c.fill();c.fillStyle='#ff9040';c.fillRect(x+11,y+1,3,3)}
+function compass(c,x,y,r){c.save();c.translate(x,y);c.strokeStyle='#6b5132';c.lineWidth=1.5;c.beginPath();c.arc(0,0,r,0,7);c.stroke();c.beginPath();c.arc(0,0,r*.75,0,7);c.stroke();
+  for(let k=0;k<8;k++){const a=k*Math.PI/4,l=k%2?r*.55:r*.95;c.fillStyle=k%2?'#a08060':'#5a3a20';c.beginPath();c.moveTo(Math.cos(a)*l,Math.sin(a)*l);c.lineTo(Math.cos(a+.25)*r*.18,Math.sin(a+.25)*r*.18);c.lineTo(Math.cos(a-.25)*r*.18,Math.sin(a-.25)*r*.18);c.fill()}
+  c.fillStyle='#3a2414';c.font='bold 12px "Pirata One", Georgia, serif';c.textAlign='center';c.fillText('N',0,-r-4);c.restore()}
+function label(c,t,x,y,size,col,font){c.font=`${size}px ${font||'"Pirata One", Georgia, serif'}`;c.textAlign='center';c.lineJoin='round';c.lineWidth=Math.max(2,size/4);c.strokeStyle='rgba(245,232,200,.9)';c.strokeText(t,x,y);c.fillStyle=col||'#3a2414';c.fillText(t,x,y)}
+
+/* ---------- carte du monde : fond illustré (mis en cache) ---------- */
+function worldArt(){if(MAP.art.world)return MAP.art.world;const S2=2,o=document.createElement('canvas');o.width=WMAP.w*S2;o.height=WMAP.h*S2;const c=o.getContext('2d');c.scale(S2,S2);const R=rng(77),P=WPOS(),W=WMAP.w,H=WMAP.h;
+  c.fillStyle='#86b0c2';c.fillRect(0,0,W,H);c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=1.2;for(let i=0;i<160;i++){const x=R()*W,y=R()*H;c.beginPath();c.arc(x,y,6,Math.PI*1.1,Math.PI*1.9);c.stroke()}
+  const cx=W*.5,cy=H*.52,pts=[];for(let i=0;i<180;i++){const a=i/180*Math.PI*2,r=1+.07*Math.sin(3*a+1)+.05*Math.sin(7*a)+.035*Math.sin(13*a+2)+.02*Math.sin(29*a);pts.push([cx+Math.cos(a)*W*.45*r,cy+Math.sin(a)*H*.43*r])}
+  const coast=()=>{c.beginPath();pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath()};
+  coast();c.strokeStyle='rgba(60,100,120,.35)';c.lineWidth=18;c.stroke();coast();c.strokeStyle='rgba(255,255,255,.35)';c.lineWidth=8;c.stroke();
+  coast();c.fillStyle='#ead7a6';c.fill();c.save();coast();c.clip();
+  for(const k in BIOME){const p=P[k];if(!p)continue;const g=c.createRadialGradient(p[0],p[1],10,p[0],p[1],k==='capitale'?150:190);g.addColorStop(0,BIOME[k][0]);g.addColorStop(.7,BIOME[k][0]+'cc');g.addColorStop(1,BIOME[k][0]+'00');c.fillStyle=g;c.beginPath();c.arc(p[0],p[1],200,0,7);c.fill()}
+  for(let i=0;i<2600;i++){c.fillStyle=R()<.5?'rgba(120,90,40,.05)':'rgba(255,255,255,.07)';c.fillRect(R()*W,R()*H,3,2)}
+  /* rivière */
+  c.strokeStyle='#7fb0cc';c.lineWidth=5;c.lineCap='round';c.beginPath();const a=P.pics,b=P.desert;c.moveTo(a[0]+40,a[1]-90);c.bezierCurveTo(a[0]-60,a[1]-20,b[0]+120,b[1]-30,b[0]+90,H);c.stroke();c.strokeStyle='#a8cfe0';c.lineWidth=2;c.stroke();
+  /* lacs */
+  for(const [x,y,r] of [[P.plaine[0]-70,P.plaine[1]+90,26],[P.foret[0]+90,P.foret[1]+70,20]]){c.fillStyle='#86b0c2';c.beginPath();c.ellipse(x,y,r*1.5,r,0,0,7);c.fill();c.strokeStyle='#5a8aa0';c.lineWidth=1.5;c.stroke()}
+  /* routes */
+  const road=(p,q,bend)=>{const mx=(p[0]+q[0])/2+bend,my=(p[1]+q[1])/2-bend*.6;c.strokeStyle='rgba(245,232,200,.8)';c.lineWidth=6;c.setLineDash([]);c.beginPath();c.moveTo(...p);c.quadraticCurveTo(mx,my,...q);c.stroke();c.strokeStyle='#8a6034';c.lineWidth=2.5;c.setLineDash([7,5]);c.stroke();c.setLineDash([])};
+  road(P.capitale,P.plaine,20);road(P.capitale,P.estates,-10);road(P.plaine,P.foret,-30);road(P.foret,P.desert,40);road(P.desert,P.pics,-30);
+  /* reliefs et végétation */
+  const scat=(k,n,rad,fn)=>{const p=P[k];for(let i=0;i<n;i++){const a=R()*Math.PI*2,d=Math.sqrt(R())*rad,x=p[0]+Math.cos(a)*d,y=p[1]+Math.sin(a)*d*.75;if(Math.hypot(x-p[0],y-p[1])<38)continue;fn(x,y)}};
+  scat('foret',150,170,(x,y)=>R()<.5?glyphPine(c,x,y,5+R()*3):glyphTree(c,x,y,4+R()*3,R()<.5?'#3f7a3a':'#4f8a3e'));
+  scat('plaine',40,170,(x,y)=>R()<.35?glyphTree(c,x,y,4+R()*2,'#6a9a44'):(c.strokeStyle='#7a9040',c.lineWidth=1,c.beginPath(),c.moveTo(x-2,y),c.lineTo(x,y-4),c.lineTo(x+2,y),c.stroke()));
+  scat('desert',70,170,(x,y)=>R()<.8?glyphDune(c,x,y,6+R()*6):glyphCactus(c,x,y));
+  scat('pics',60,170,(x,y)=>R()<.75?glyphMount(c,x,y,9+R()*9):glyphPine(c,x,y,5,true));
+  scat('capitale',20,110,(x,y)=>{c.fillStyle=R()<.5?'#c9b46a':'#a8b860';c.fillRect(x-7,y-4,14,8);c.strokeStyle='rgba(90,70,30,.4)';c.strokeRect(x-7,y-4,14,8)});
+  c.restore();coast();c.strokeStyle='#6b5132';c.lineWidth=2.5;c.stroke();
+  /* cadre, rose des vents, cartouche */
+  const g=c.createRadialGradient(W/2,H/2,H*.4,W/2,H/2,W*.7);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(80,50,20,.35)');c.fillStyle=g;c.fillRect(0,0,W,H);
+  c.strokeStyle='#6b5132';c.lineWidth=6;c.strokeRect(3,3,W-6,H-6);c.lineWidth=1.5;c.strokeRect(12,12,W-24,H-24);
+  compass(c,90,H-90,44);
+  c.fillStyle='rgba(245,232,200,.92)';c.fillRect(24,22,250,52);c.strokeStyle='#6b5132';c.lineWidth=2;c.strokeRect(24,22,250,52);c.fillStyle='#3a2414';c.font='26px "Pirata One", Georgia, serif';c.textAlign='left';c.fillText('Royaume de Cendre',38,56);
+  return MAP.art.world=o}
+
+/* ---------- carte de région : miniature réelle (mise en cache) ---------- */
+function regionArt(id){if(MAP.art['r-'+id])return MAP.art['r-'+id];const L=RLAY[id],k=.5,o=document.createElement('canvas');o.width=L.w*k;o.height=L.h*k;const c=o.getContext('2d');
+  let w=world&&world.id===id?world:null;if(!w){try{w=buildRegion(id)}catch(e){w=null}}
+  if(w){if(!w.bg&&w.bgFn)try{w.bg=w.bgFn()}catch(e){}if(w.bg)c.drawImage(w.bg,0,0,o.width,o.height);
+    c.save();c.scale(k,k);const props=w.props.filter(p=>p.type==='spr').sort((a,b)=>a.y-b.y);for(const p of props)try{spr(c,p.n,p.x,p.y+2)}catch(e){}
+    for(const d in L.dun){const D=DUNGEONS[d];try{spr(c,'arch',D.x,D.y)}catch(e){}}c.restore()}
+  else{c.fillStyle='#b9cf78';c.fillRect(0,0,o.width,o.height)}
+  c.fillStyle='rgba(234,215,166,.22)';c.fillRect(0,0,o.width,o.height);
+  return MAP.art['r-'+id]=o}
+function fogArt(id){const key='f-'+id;const cached=MAP.art[key];if(cached&&cached.ver===fogVer)return cached.c;const L=RLAY[id],k=.5,[gw,gh]=fogGrid(id),f=fogGet(id);
+  const o=cached?cached.c:document.createElement('canvas');o.width=L.w*k;o.height=L.h*k;const c=o.getContext('2d');c.globalCompositeOperation='source-over';c.fillStyle='#d8c59a';c.fillRect(0,0,o.width,o.height);
+  const R=rng(9);c.fillStyle='rgba(120,90,50,.12)';for(let i=0;i<500;i++)c.fillRect(R()*o.width,R()*o.height,4,2);
+  c.globalCompositeOperation='destination-out';const cs=FOGC*k;
+  for(let y=0;y<gh;y++)for(let x=0;x<gw;x++)if(f[y*gw+x]==='1'){const px=(x+.5)*cs,py=(y+.5)*cs,g=c.createRadialGradient(px,py,0,px,py,cs*1.1);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(.6,'rgba(0,0,0,.9)');g.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=g;c.fillRect(px-cs*1.2,py-cs*1.2,cs*2.4,cs*2.4)}
+  c.globalCompositeOperation='source-over';MAP.art[key]={c:o,ver:fogVer};return o}
+
+/* ---------- dessin principal ---------- */
+function drawMap2(){const cv=$('#mapc2'),c=cv.getContext('2d'),V=MV[MAP.mode];if(!V.fit)mapFit();const t=performance.now()/1000;
+  c.setTransform(1,0,0,1,0,0);c.fillStyle='#2a2018';c.fillRect(0,0,cv.width,cv.height);c.setTransform(MAP.dpr*V.s,0,0,MAP.dpr*V.s,MAP.dpr*V.x,MAP.dpr*V.y);c.imageSmoothingEnabled=true;
+  document.querySelectorAll('#mtabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===MAP.mode));
+  MAP.pois=[];const poi=(x,y,r,o)=>MAP.pois.push(Object.assign({x,y,r},o));const iz=1/V.s;
+  if(MAP.mode==='world'){drawWorld2(c,t,poi,iz)}else drawRegion2(c,t,poi,iz);
+  if(MAP.sel){const s=MAP.sel;c.strokeStyle='#fff';c.lineWidth=2*iz;c.beginPath();c.arc(s.x,s.y,(s.r||14)+4*iz+Math.sin(t*6)*2*iz,0,7);c.stroke()}}
+function drawWorld2(c,t,poi,iz){const LS=Math.max(1,iz*.7);const P=WPOS(),here=hereReg(),qt=questTarget();$('#mtitle').textContent='Carte du monde';
+  c.drawImage(worldArt(),0,0,WMAP.w,WMAP.h);
+  /* brouillard sur les régions inconnues */
+  for(const k in REG)if(!S.disc.includes(k)&&!isAdmin()){const p=P[k],R=rng(k.length*31);for(let i=0;i<26;i++){const a=R()*7,d=R()*120;{const v=228+R()*18|0;c.fillStyle=`rgba(${v},${v-2},${v-8},.9)`};c.beginPath();c.arc(p[0]+Math.cos(a)*d,p[1]+Math.sin(a)*d*.7,30+R()*30,0,7);c.fill()}}
+  /* lieux */
+  const node=(k,name,sub,draw)=>{const [x,y]=P[k],disc=k==='capitale'||k==='estates'||S.disc.includes(k)||isAdmin();
+    c.fillStyle='rgba(245,232,200,.85)';c.beginPath();c.arc(x,y,24,0,7);c.fill();c.strokeStyle=k===here?'#d0402a':'#6b5132';c.lineWidth=k===here?3:2;c.stroke();draw(x,y);
+    label(c,disc?name:'???',x,y+30+12*LS,18*LS);if(sub)label(c,sub,x,y+34+26*LS,11*LS,'#5a4a30','"Alegreya Sans", sans-serif');poi(x,y,30,{kind:'wreg',k})};
+  node('capitale',TIERS[S.bld.hall]+' de Cendre','cité · niv. '+S.bld.hall,(x,y)=>glyphCastle(c,x,y+8));
+  node('estates','Domaine',S.plots.filter(p=>p.owner>=0).length+' terrain(s)',(x,y)=>glyphHut(c,x,y+6));
+  for(const k in REG){const R_=REG[k];node(k,R_.n,'niveau '+R_.tier+(S.disc.includes(k)?' · exploré '+fogPct(k)+' %':''),(x,y)=>{const ic={plaine:'bigtree_green',foret:'tree_pine',desert:'palm',pics:'pine_snow'}[k];try{frame(c,ic,0,0,0,0,x,y+12,{sc:AT[ic]&&AT[ic][3]>40?.5:1})}catch(e){}});
+    const L=RLAY[k],[nx,ny]=P[k];for(const d in L.dun){const D=DUNGEONS[d],dx=nx+(D.x/L.w-.5)*190,dy=ny+(D.y/L.h-.5)*130,won=S.wins[d]>0,key=hasKey(d);
+      glyphCave(c,dx,dy,BOSSES[D.boss].eye);if(won){c.fillStyle='#ffd34a';c.font='bold 11px sans-serif';c.textAlign='center';c.fillText('★',dx+10,dy-6)}if(!key){c.fillStyle='#5a3a20';c.font='bold 9px sans-serif';c.fillText('🔒',dx-11,dy-5)}
+      poi(dx,dy,14,{kind:'wdun',d})}}
+  /* objectif et repère */
+  if(qt&&qt.reg&&P[qt.reg]){let [x,y]=P[qt.reg];if(qt.x!=null&&RLAY[qt.reg]){const L=RLAY[qt.reg];x+=(qt.x/L.w-.5)*190;y+=(qt.y/L.h-.5)*130}
+    const col=qt.q.m?'#e0402a':'#d9a020';c.strokeStyle=col;c.lineWidth=3;c.beginPath();c.arc(x,y,16+Math.sin(t*4)*3,0,7);c.stroke();label(c,(qt.q.m?'★ ':'')+qt.q.n,x,y-20-8*LS,13*LS,col,'bold "Alegreya Sans", sans-serif')}
+  if(S.pin&&P[S.pin.r]){const L=RLAY[S.pin.r];let [x,y]=P[S.pin.r];if(L){x+=(S.pin.x/L.w-.5)*190;y+=(S.pin.y/L.h-.5)*130}c.fillStyle='#fff';c.strokeStyle='#3a2414';c.lineWidth=1.5;c.beginPath();c.moveTo(x,y);c.lineTo(x,y-18);c.lineTo(x+11,y-14);c.lineTo(x,y-10);c.stroke();c.fill()}
+  /* moi */
+  {const [x,y]=P[here]||P.capitale,f=G.players[0];c.strokeStyle='#d0402a';c.lineWidth=2;c.beginPath();c.arc(x,y,30+Math.sin(t*4)*2,0,7);c.stroke();try{frame(c,'fc_'+f.h.look,0,0,38,38,x+26,y-18,{sc:.55})}catch(e){}}
+  $('#mleg').innerHTML=`<span><i class="lg" style="background:#d0402a"></i>vous</span><span>🔒 clé manquante</span><span>★ boss vaincu</span><span><i class="lg" style="background:#e0402a"></i>quête suivie</span><span>Touchez un lieu pour sa fiche</span>`}
+function drawRegion2(c,t,poi,iz){const Z=Math.min(iz,3),at=(x,y,fn)=>{c.save();c.translate(x,y);c.scale(Z,Z);fn();c.restore()},lab=(t_,x,y,sz,col,f)=>label(c,t_,x,y,sz*Z,col,f);const id=MAP.rid,L=RLAY[id],k=.5,P=(x,y)=>[x*k,y*k],cur=world&&world.id===id;$('#mtitle').textContent=REG[id].n+' · exploré '+fogPct(id)+' %';
+  const W=L.w*k,H=L.h*k;c.drawImage(regionArt(id),0,0,W,H);
+  /* ressources et monstres seulement là où l'on a exploré */
+  if(cur){for(const n of world.nodes||[])if(nodeReady(n)&&fogSeen(id,n.x,n.y)){const [a,b]=P(n.x,n.y);c.fillStyle=RES[n.type].c;c.strokeStyle='#2a1a10';c.lineWidth=.8*iz;c.beginPath();c.moveTo(a,b-4*iz);c.lineTo(a+3*iz,b);c.lineTo(a,b+4*iz);c.lineTo(a-3*iz,b);c.closePath();c.fill();c.stroke()}
+    for(const pk of world.packs||[]){const al=pk.ms.filter(e=>e.hp>0);if(!al.length||!fogSeen(id,pk.x,pk.y))continue;const [a,b]=P(pk.x,pk.y);c.fillStyle=pk.elite?'#ff9a30':'#c0402e';c.beginPath();c.arc(a,b,4*iz,0,7);c.fill();c.strokeStyle='#2a1010';c.lineWidth=iz;c.stroke();
+      const lv=Math.max(...al.map(mobLv));c.font=`bold ${8*iz}px sans-serif`;c.textAlign='center';c.fillStyle=lvCol(lv);c.fillText('lvl '+lv,a,b-6*iz)}}
+  c.drawImage(fogArt(id),0,0,W,H);
+  c.strokeStyle='#6b5132';c.lineWidth=3*iz;c.strokeRect(0,0,W,H);
+  /* lieux */
+  {const [a,b]=P(...L.camp);at(a,b,()=>glyphTent(c,0,0));lab('Camp',a,b+16*Z,12);poi(a,b,16*Z,{kind:'camp'})}
+  for(const d in L.dun){const D=DUNGEONS[d],[a,b]=P(D.x,D.y),seen=fogSeen(id,D.x,D.y)||S.wins[d]>0;at(a,b,()=>glyphCave(c,0,0,BOSSES[D.boss].eye));
+    lab(seen?D.n+(S.wins[d]?' ★':''):'Donjon inconnu',a,b+17*Z,11);lab('niv. '+DUNLV[d]+(hasKey(d)?'':' · 🔒'),a,b+29*Z,9,'#5a3a20','"Alegreya Sans", sans-serif');poi(a,b,16*Z,{kind:'dun',d})}
+  for(const e of L.exits){const x=clamp(e.x,30,L.w-30),y=clamp(e.y,30,L.h-30),[a,b]=P(x,y);c.fillStyle='#5a8ab0';c.beginPath();c.arc(a,b,6*Z,0,7);c.fill();c.strokeStyle='#fff';c.lineWidth=1.5*Z;c.stroke();
+    const nm=e.to==='capitale'?'Cité':REG[e.to].n;lab('→ '+nm,a+(e.x>L.w-30?-30:e.x<30?30:0)*Z,b+(e.y<30?18:e.y>L.h-30?-10:0)*Z,11,'#24506e','bold "Alegreya Sans", sans-serif');poi(a,b,12*Z,{kind:'exit',to:e.to})}
+  for(const k2 in NPCS){const N=NPCS[k2];if(N.zone!==id)continue;const x=L.camp[0]+(N.dx||0),y=L.camp[1]+(N.dy||0),m=npcMark(k2);if(!m)continue;const [a,b]=P(x,y);lab(m[0],a+10*Z,b-4*Z,15,markCol(m),'bold "Alegreya Sans", sans-serif')}
+  /* objectif, repère, joueurs */
+  const qt=questTarget();if(qt&&qt.reg===id&&qt.x!=null){const [a,b]=P(qt.x,qt.y),col=qt.q.m?'#e0402a':'#d9a020';c.strokeStyle=col;c.lineWidth=2.5*iz;c.beginPath();c.arc(a,b,(12+Math.sin(t*4)*3)*iz,0,7);c.stroke();lab((qt.q.m?'★ ':'')+qt.q.n,a,b-18*iz,12,col,'bold "Alegreya Sans", sans-serif')}
+  if(S.pin&&S.pin.r===id){const [a,b]=P(S.pin.x,S.pin.y);c.save();c.translate(a,b);c.scale(iz,iz);c.fillStyle='#5a3a20';c.fillRect(0,-18,2,18);c.fillStyle='#fff';c.beginPath();c.moveTo(2,-18);c.lineTo(13,-14);c.lineTo(2,-10);c.fill();c.strokeStyle='#3a2414';c.stroke();c.restore();poi(a,b,12,{kind:'pin'})}
+  if(cur){for(const r of Object.values(NET.remote||{})){const [a,b]=P(r.rx,r.ry);c.fillStyle='#4aa0ff';c.beginPath();c.arc(a,b,4.5*iz,0,7);c.fill();c.strokeStyle='#fff';c.lineWidth=1.2*iz;c.stroke();lab(r.n||'',a,b-8*iz,10,'#1a4a8a','bold "Alegreya Sans", sans-serif')}
+    const p=G.players[0],[a,b]=P(p.x,p.y),ang=Math.atan2(p.fy||0,p.fx||0)||Math.PI/2;c.save();c.translate(a,b);c.scale(iz,iz);c.rotate(ang);c.fillStyle='#d0402a';c.strokeStyle='#fff';c.lineWidth=1.5;c.beginPath();c.moveTo(9,0);c.lineTo(-6,-6);c.lineTo(-3,0);c.lineTo(-6,6);c.closePath();c.fill();c.stroke();c.restore();
+    c.strokeStyle='rgba(208,64,42,.7)';c.lineWidth=1.5*iz;c.beginPath();c.arc(a,b,(14+Math.sin(t*4)*3)*iz,0,7);c.stroke()}
+  poi(0,0,0,{kind:'bg'});
+  $('#mleg').innerHTML=`<span><i class="lg" style="background:#d0402a"></i>vous</span><span><i class="lg" style="background:#4aa0ff"></i>autre joueur</span><span>◆ ressources</span><span><i class="lg" style="background:#c0402e"></i>monstres</span><span>Touchez la carte pour poser un repère</span>`}
+
+/* ---------- fiches et actions ---------- */
+function mapTap(sx,sy){const V=MV[MAP.mode],mx=(sx-V.x)/V.s,my=(sy-V.y)/V.s;let best=null,bd=1e9;
+  for(const p of MAP.pois){if(p.kind==='bg')continue;const d=dist(mx,my,p.x,p.y);if(d<Math.max(p.r,18/V.s)&&d<bd){bd=d;best=p}}
+  if(!best&&MAP.mode==='region'){const L=RLAY[MAP.rid];if(mx<0||my<0||mx>L.w*.5||my>L.h*.5)return;best={kind:'spot',x:mx,y:my,r:6}}
+  MAP.sel=best;mapCard(best)}
+function mapCard(p){const c=$('#mcard');if(!p){c.hidden=true;return}c.hidden=false;const btns=[];let h='';const indun=world&&world.kind==='dungeon';
+  const pinAt=(r,x,y,lbl)=>btns.push(['Poser un repère',()=>{S.pin={r,x:Math.round(x),y:Math.round(y)};save();banner('Repère posé'+(lbl?' : '+lbl:''));c.hidden=true;MAP.sel=null}]);
+  if(p.kind==='wreg'){const k=p.k;if(k==='capitale'||k==='estates'){h=`<h3>${k==='capitale'?TIERS[S.bld.hall]+' de Cendre':'Domaine des aventuriers'}</h3><p>${k==='capitale'?'Hôtel de ville niveau '+S.bld.hall+'. Bâtiments, artisans et quêtes.':'Terrains, maisons et écurie.'}</p>`;
+      btns.push(['Voyager',()=>{if(indun)return mapToast('Impossible de quitter un donjon par la carte.');closeMap();k==='capitale'?go('town'):go('estates')}])}
+    else{const R_=REG[k],L=RLAY[k],disc=S.disc.includes(k)||isAdmin(),ds=Object.keys(L.dun);
+      h=`<h3>${disc?R_.n:'Région inconnue'}</h3><p>Niveau ${R_.tier} · ${disc?'exploré à '+fogPct(k)+' %':'rejoignez-la à pied pour la découvrir'}</p><p class="note">Donjons : ${ds.map(d=>DUNGEONS[d].n+' (niv. '+DUNLV[d]+(S.wins[d]?', ★':'')+(hasKey(d)?'':', 🔒')+')').join(' · ')}</p><p class="note">Ressources : ${Object.keys(L.nodes).map(r=>RES[r].n.toLowerCase()).join(', ')}</p>`;
+      if(disc){btns.push(['Voir la carte',()=>{MAP.rid=k;MAP.mode='region';MV.region.fit=false;c.hidden=true;MAP.sel=null}]);btns.push(['Voyager au camp',()=>{if(indun)return mapToast('Impossible de quitter un donjon par la carte.');closeMap();go('region',{id:k})}])}}}
+  if(p.kind==='wdun'||p.kind==='dun'){const d=p.d,D=DUNGEONS[d],h_=curHero();h=`<h3>${D.n}</h3><p>Boss : ${BOSSES[D.boss].n}${S.wins[d]?' · vaincu '+S.wins[d]+' fois':''}</p><p>Niveau minimum ${DUNLV[d]} <span class="${h_.lv>=DUNLV[d]?'okc':'no'}">(${h_.lv>=DUNLV[d]?'✓':'vous : '+h_.lv})</span> · ${hasKey(d)?'<span class="okc">clé possédée</span>':'<span class="no">'+keyName(d)+' requise</span>'}</p><p class="note">Clé : quête de boss, butin des monstres de la région, ou forge.</p>`;
+    pinAt(D.region,D.x,D.y+30,D.n);if(p.kind==='wdun'&&(S.disc.includes(D.region)||isAdmin()))btns.push(['Voir la région',()=>{MAP.rid=D.region;MAP.mode='region';MV.region.fit=false;c.hidden=true;MAP.sel=null}])}
+  if(p.kind==='camp'){const L=RLAY[MAP.rid];h=`<h3>Camp · ${REG[MAP.rid].n}</h3><p>Feu de camp, PNJ et repos.</p>`;btns.push(['Aller au camp',()=>{if(indun)return mapToast('Impossible de quitter un donjon par la carte.');closeMap();if(world.id===MAP.rid){const pl=G.players[0];pl.x=L.camp[0];pl.y=L.camp[1]+70;snapCam();sfx('ok',.3)}else go('region',{id:MAP.rid})}])}
+  if(p.kind==='exit'){h=`<h3>Sortie vers ${p.to==='capitale'?'la cité':REG[p.to].n}</h3>`;const L=RLAY[MAP.rid],e=L.exits.find(e=>e.to===p.to);pinAt(MAP.rid,clamp(e.x,40,L.w-40),clamp(e.y,40,L.h-40),'sortie')}
+  if(p.kind==='spot'){h=`<h3>Repère</h3><p>Une flèche à l'écran vous guidera jusqu'ici.</p>`;pinAt(MAP.rid,p.x*2,p.y*2)}
+  if(p.kind==='pin'){h=`<h3>Votre repère</h3>`;btns.push(['Retirer',()=>{S.pin=null;save();c.hidden=true;MAP.sel=null}])}
+  /* suivi de quête */
+  const act=QUESTS.filter(q=>{const s=qState(curHero(),q.id);return s&&s.s===1}),tq=trackedQuest();
+  if(act.length>1&&(p.kind==='wreg'||p.kind==='camp'))h+=`<div class="qtrack"><span class="lbl">Quête suivie</span><select id="mtq">${act.map(q=>`<option value="${q.id}" ${tq&&tq.id===q.id?'selected':''}>${q.m?'★ ':''}${q.n}</option>`).join('')}</select></div>`;
+  c.innerHTML=h+`<div class="row" id="mcb"></div>`;const row=$('#mcb');
+  for(const [n,fn] of btns){const b=document.createElement('button');b.className='btn sm';b.textContent=n;b.onclick=fn;row.appendChild(b)}
+  const x=document.createElement('button');x.className='btn ghost sm';x.textContent='Fermer';x.onclick=()=>{c.hidden=true;MAP.sel=null};row.appendChild(x);
+  const sel=$('#mtq');if(sel)sel.onchange=()=>{S.track=sel.value;save()}}
+/* le journal permet aussi de choisir la quête suivie */
+{const _qj=questJournal;questJournal=function(h){const tq=trackedQuest();return _qj(h).replace(/<div class="qrow([^"]*)"><div class="t"><b>(★ )?([^<]+)<\/b>/g,(m,cl,st,n)=>{const q=QUESTS.find(q=>q.n===n.trim()&&qState(h,q.id)&&qState(h,q.id).s===1);if(!q)return m;return `<div class="qrow${cl}${tq&&tq.id===q.id?' tracked':''}" data-tq="${q.id}"><div class="t"><b>${st||''}${n}${tq&&tq.id===q.id?' <small class="trk">◎ suivie</small>':''}</b>`})}}
+document.addEventListener('click',e=>{const r=e.target.closest&&e.target.closest('[data-tq]');if(!r||!$('#htab')||!$('#htab').contains(r))return;S.track=r.dataset.tq;save();renderHeroes()});
+
 migrate12(S);
 /* ===== Interface ===== */
 function renderRes(){
@@ -2521,7 +2755,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='16.1';
+const VERSION='17.0';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
