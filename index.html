@@ -212,6 +212,8 @@ kbd{font-family:var(--body);font-size:12px;background:#2a2219;border:1px solid v
 .qrow.tracked{outline:2px solid #ffd34a}.trk{color:#ffd34a;font-weight:400}.qrow[data-tq]{cursor:pointer}
 @media (max-width:700px){.mcard{left:10px;right:10px;max-width:none}.mleg{display:none}}
 
+.npch canvas.pt{width:96px;height:96px;border:2px solid #3a2414;border-radius:4px;background:#14110d}
+
 </style>
 </head>
 <body>
@@ -3186,6 +3188,11 @@ const SERV={hall:'Château : salle du trône et bibliothèque d\'Élise.',forge:
 openBld=function(k){const D=BLD[k];panel(`<h2>${D.n}</h2><p>${SERV[k]||D.d}</p><div class="row">${k==='forge'?'<button class="btn sm" id="sv1">Artisanat</button>':k==='sanct'?'<button class="btn sm" id="sv1">Alchimie</button>':k==='marche'?'<button class="btn sm" id="sv1">Vendre</button>':''}<button class="btn ghost" id="cl">Fermer</button></div>`);
   const b=$('#sv1');if(b)b.onclick=()=>{if(k==='marche')openTrade();else openCraft()}};
 {const _tl=trigLabel;trigLabel=function(tr){if(tr.kind==='bld'){const n=BLD[tr.k].n;return INTERIORS[tr.k]?'Entrer : '+n:n}return _tl(tr)}}
+/* ---------- portraits de dialogue (48×48, planche portraits.png) ---------- */
+IMG.port=new Image();IMG.port.src='portraits.png';
+const PORT={sage:0,garde:1,forge:2,pretre:3,marchand:4,elise:5,kenji:6,yuki:7,aldric:8,roicendre:9};
+function drawPortrait(cv,i){cv.width=48;cv.height=48;cv.classList.add('pt');const c=cv.getContext('2d');c.imageSmoothingEnabled=false;const d=()=>{c.clearRect(0,0,48,48);c.drawImage(IMG.port,i*48,0,48,48,0,0,48,48)};if(ready(IMG.port))d();else IMG.port.addEventListener('load',d,{once:true})}
+{const _on=openNpc;openNpc=function(id){_on(id);const i=PORT[id];if(i==null)return;const cv=document.querySelector('.npch canvas');if(cv){delete cv.dataset.face;drawPortrait(cv,i)}}}
 
 migrate12(S);
 /* ===== Interface ===== */
@@ -3220,7 +3227,7 @@ for(const [id,k] of [['bAtk','atk'],['bRoll','roll'],['bS1','s1'],['bS2','s2'],[
 $('#reset').onclick=function(){if(this.dataset.armed){S=migrate12(JSON.parse(JSON.stringify(DEF)));save();this.dataset.armed='';this.textContent='Recommencer la partie';$('#resetMsg').textContent='Partie remise à zéro.';renderRes();closeMenu();initGame();charSelect()}
   else{this.dataset.armed='1';this.textContent='Confirmer la remise à zéro';$('#resetMsg').textContent='Ressources, bâtiments et héros seront perdus.'}};
 
-const VERSION='21.0';
+const VERSION='21.1';
 function showErr(e){if(window._ccErr)return;window._ccErr=1;console.error(e);const d=document.createElement('div');d.style.cssText='position:fixed;left:8px;right:8px;top:40%;z-index:99;background:#3a120c;color:#fff;font:13px sans-serif;padding:10px;border:2px solid #d65a3c;user-select:text;-webkit-user-select:text';d.textContent='Erreur (v'+VERSION+') : '+(e&&e.message)+' — '+String(e&&e.stack||'').split('\n').slice(1,3).join(' | ');d.onclick=()=>{d.remove();window._ccErr=0};document.body.appendChild(d)}
 addEventListener('error',ev=>showErr(ev.error||{message:ev.message}));
 let last=performance.now();
